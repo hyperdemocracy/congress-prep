@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "congress_prep"
+version = "0.1.0"
+description = ""
+authors = ["Gabriel Altay"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+skypilot = {extras = ["aws"], version = "^0.4.1"}
+huggingface-hub = "^0.20.3"
+pandas = "^2.2.0"
+pyarrow = "^15.0.0"
+rich = "^13.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

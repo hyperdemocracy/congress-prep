@@ -1,0 +1,4 @@
+---
+output:
+  data: /output/congress-scraper/data
+  cache: /output/congress-scraper/cache

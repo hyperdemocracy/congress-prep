@@ -1,0 +1,28 @@
+envs:
+  S3_BUCKET: hyperdemocracy
+
+resources:
+  cloud: "aws"
+  cpus: 2
+
+num_nodes: 1
+
+file_mounts:
+  /output:
+    name: ${S3_BUCKET}
+    store: s3
+    mode: MOUNT
+
+workdir:
+  sky_workdir
+
+# Commands to be run before executing the job.
+setup: |
+  git clone https://github.com/unitedstates/congress.git
+  cd congress && pip install -e .
+
+# Commands to run as a job.
+run: |
+  which usc-run
+  echo $CONGRESS_NUM
+  ls /output/congress-scraper/*/*
