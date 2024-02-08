@@ -845,8 +845,8 @@ if __name__ == "__main__":
     import rich
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
-    #    for cn in range(109, 119):
-    for cn in range(117, 118):
+    for cn in range(109, 119):
+#    for cn in range(117, 118):
         print(cn)
         xml_file_path = congress_hf_path / f"usc-{cn}-billstatus.parquet"
         df = pd.read_parquet(xml_file_path)
