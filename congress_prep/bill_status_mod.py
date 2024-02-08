@@ -2,6 +2,9 @@
 https://github.com/usgpo/bill-status/tree/main
 https://www.congress.gov/help/legislative-glossary
 """
+
+from __future__ import annotations
+from collections import Counter
 import datetime
 from pathlib import Path
 from typing import Optional
@@ -11,29 +14,29 @@ from xml.etree.ElementTree import Element
 from pydantic import BaseModel
 
 
-def get_text_or_none(element: Optional[Element] = None) -> Optional[str]:
-    return element.text if element is not None else None
+def get_text_or_none(xel: Optional[Element] = None) -> Optional[str]:
+    return xel.text if xel is not None else None
 
 
 class Activity(BaseModel):
     name: str
     date: datetime.datetime
 
-
-def get_activities(element: Optional[Element]) -> list[Activity]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[Activity]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "activities"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            activity = cls(
+                name=get_text_or_none(item.find("name")),
+                date=get_text_or_none(item.find("date")),
+            )
+            result.append(activity)
         return result
-    assert element.tag == "activities"
-    for item in element:
-        if item.tag != "item":
-            continue
-        activity = Activity(
-            name=get_text_or_none(item.find("name")),
-            date=get_text_or_none(item.find("date")),
-        )
-        result.append(activity)
-    return result
 
 
 class Subcommittee(BaseModel):
@@ -41,22 +44,22 @@ class Subcommittee(BaseModel):
     name: str
     activities: list[Activity]
 
-
-def get_subcommittees(element: Optional[Element]) -> list[Subcommittee]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[Subcommittee]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "subcommittees"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            subcommittee = cls(
+                system_code=get_text_or_none(item.find("systemCode")),
+                name=get_text_or_none(item.find("name")),
+                activities=Activity.list_from_xel(item.find("activities")),
+            )
+            result.append(subcommittee)
         return result
-    assert element.tag == "subcommittees"
-    for item in element:
-        if item.tag != "item":
-            continue
-        subcommittee = Subcommittee(
-            system_code=get_text_or_none(item.find("systemCode")),
-            name=get_text_or_none(item.find("name")),
-            activities=get_activities(item.find("activities")),
-        )
-        result.append(subcommittee)
-    return result
 
 
 class Committee(BaseModel):
@@ -67,60 +70,60 @@ class Committee(BaseModel):
     subcommittees: list[Subcommittee] = []
     activities: list[Activity] = []
 
-
-def get_committees(element: Optional[Element]) -> list[Committee]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[Committee]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "committees"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            committee = cls(
+                system_code=get_text_or_none(item.find("systemCode")),
+                name=get_text_or_none(item.find("name")),
+                chamber=get_text_or_none(item.find("chamber")),
+                type=get_text_or_none(item.find("type")),
+                subcommittees=Subcommittee.list_from_xel(item.find("subcommittees")),
+                activities=Activity.list_from_xel(item.find("activities")),
+            )
+            result.append(committee)
         return result
-    assert element.tag == "committees"
-    for item in element:
-        if item.tag != "item":
-            continue
-        committee = Committee(
-            system_code=get_text_or_none(item.find("systemCode")),
-            name=get_text_or_none(item.find("name")),
-            chamber=get_text_or_none(item.find("chamber")),
-            type=get_text_or_none(item.find("type")),
-            subcommittees=get_subcommittees(item.find("subcommittees")),
-            activities=get_activities(item.find("activities")),
-        )
-        result.append(committee)
-    return result
 
 
 class CommitteeReport(BaseModel):
     citation: str
 
-
-def get_committee_reports(element: Optional[Element]) -> list[CommitteeReport]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[CommitteeReport]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "committeeReports"
+        for item in xel:
+            if item.tag != "committeeReport":
+                continue
+            committee_report = cls(
+                citation=get_text_or_none(item.find("citation")),
+            )
+            result.append(committee_report)
         return result
-    assert element.tag == "committeeReports"
-    for item in element:
-        if item.tag != "committeeReport":
-            continue
-        committee_report = CommitteeReport(
-            citation=get_text_or_none(item.find("citation")),
-        )
-        result.append(committee_report)
-    return result
 
 
 class SourceSystem(BaseModel):
     name: str
     code: Optional[str] = None
 
-
-def get_source_system(element: Optional[Element]) -> Optional[SourceSystem]:
-    if element is None:
-        return None
-    else:
-        assert element.tag == "sourceSystem"
-        return SourceSystem(
-            name=get_text_or_none(element.find("name")),
-            code=get_text_or_none(element.find("code")),
-        )
+    @classmethod
+    def from_xel(cls, xel: Optional[Element]) -> Optional[SourceSystem]:
+        if xel is None:
+            return None
+        else:
+            assert xel.tag == "sourceSystem"
+            return cls(
+                name=get_text_or_none(xel.find("name")),
+                code=get_text_or_none(xel.find("code")),
+            )
 
 
 class Action(BaseModel):
@@ -131,83 +134,85 @@ class Action(BaseModel):
     source_system: Optional[SourceSystem] = None
     committees: list[Committee] = []
 
+    @classmethod
+    def from_xel(cls, xel: Optional[Element]) -> Optional[Action]:
+        if xel is None:
+            return None
+        action = cls(
+            action_date=get_text_or_none(xel.find("actionDate")),
+            text=get_text_or_none(xel.find("text")),
+            type=get_text_or_none(xel.find("type")),
+            action_code=get_text_or_none(xel.find("actionCode")),
+            source_system=SourceSystem.from_xel(xel.find("sourceSystem")),
+            committees=Committee.list_from_xel(xel.find("committees")),
+        )
+        return action
 
-def get_action(element: Optional[Element]) -> Optional[Action]:
-    if element is None:
-        return None
-    action = Action(
-        action_date=get_text_or_none(element.find("actionDate")),
-        text=get_text_or_none(element.find("text")),
-        type=get_text_or_none(element.find("type")),
-        action_code=get_text_or_none(element.find("actionCode")),
-        source_system=get_source_system(element.find("sourceSystem")),
-        committees=get_committees(element.find("committees")),
-    )
-    return action
-
-
-def get_actions(element: Optional[Element]) -> list[Action]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[Action]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "actions"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            action = cls.from_xel(item)
+            if action is not None:
+                result.append(action)
         return result
-    assert element.tag == "actions"
-    for item in element:
-        if item.tag != "item":
-            continue
-        action = get_action(item)
-        if action is not None:
-            result.append(action)
-    return result
 
 
 class RelationshipDetail(BaseModel):
     type: str
     identified_by: str
 
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[RelationshipDetail]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "relationshipDetails"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            relationship_detail = cls(
+                type=get_text_or_none(item.find("type")),
+                identified_by=get_text_or_none(item.find("identifiedBy")),
+            )
+            result.append(relationship_detail)
+        return result
+
 
 class RelatedBill(BaseModel):
-    title: str
+    title: Optional[str]
     congress: int
     number: int
     type: str
     latest_action: Action
     relationship_details: list[RelationshipDetail]
 
-
-def get_relationship_details(element: Optional[Element]) -> list[RelationshipDetail]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[RelatedBill]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "relatedBills"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            related_bill = cls(
+                title=get_text_or_none(item.find("title")),
+                congress=get_text_or_none(item.find("congress")),
+                number=get_text_or_none(item.find("number")),
+                type=get_text_or_none(item.find("type")),
+                latest_action=Action.from_xel(item.find("latestAction")),
+                relationship_details=RelationshipDetail.list_from_xel(
+                    item.find("relationshipDetails")
+                ),
+            )
+            result.append(related_bill)
         return result
-    assert element.tag == "relationshipDetails"
-    for item in element:
-        if item.tag != "item":
-            continue
-        relationship_detail = RelationshipDetail(
-            type=get_text_or_none(item.find("type")),
-            identified_by=get_text_or_none(item.find("identifiedBy")),
-        )
-        result.append(relationship_detail)
-    return result
-
-
-def get_related_bills(element: Optional[Element]) -> list[RelatedBill]:
-    result = []
-    if element is None:
-        return result
-    assert element.tag == "relatedBills"
-    for item in element:
-        if item.tag != "item":
-            continue
-        related_bill = RelatedBill(
-            title=get_text_or_none(item.find("title")),
-            congress=get_text_or_none(item.find("congress")),
-            number=get_text_or_none(item.find("number")),
-            type=get_text_or_none(item.find("type")),
-            latest_action = get_action(item.find("latestAction")),
-            relationship_details = get_relationship_details(item.find("relationshipDetails")),
-        )
-        result.append(related_bill)
-    return result
 
 
 class Title(BaseModel):
@@ -218,25 +223,29 @@ class Title(BaseModel):
     bill_text_version_name: Optional[str] = None
     bill_text_version_code: Optional[str] = None
 
-
-def get_titles(element: Element) -> list[Title]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[Title]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "titles"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            title = cls(
+                title_type=get_text_or_none(item.find("titleType")),
+                title=get_text_or_none(item.find("title")),
+                chamber_code=get_text_or_none(item.find("chamberCode")),
+                chamber_name=get_text_or_none(item.find("chamberName")),
+                bill_text_version_name=get_text_or_none(
+                    item.find("billTextVersionName")
+                ),
+                bill_text_version_code=get_text_or_none(
+                    item.find("billTextVersionCode")
+                ),
+            )
+            result.append(title)
         return result
-    assert element.tag == "titles"
-    for item in element:
-        if item.tag != "item":
-            continue
-        title = Title(
-            title_type=get_text_or_none(item.find("titleType")),
-            title=get_text_or_none(item.find("title")),
-            chamber_code=get_text_or_none(item.find("chamberCode")),
-            chamber_name=get_text_or_none(item.find("chamberName")),
-            bill_text_version_name=get_text_or_none(item.find("billTextVersionName")),
-            bill_text_version_code=get_text_or_none(item.find("billTextVersionCode")),
-        )
-        result.append(title)
-    return result
 
 
 class Identifiers(BaseModel):
@@ -244,17 +253,17 @@ class Identifiers(BaseModel):
     lis_id: Optional[str] = None
     gpo_id: Optional[str] = None
 
-
-def get_identifiers(element: Optional[Element]) -> Optional[Identifiers]:
-    if element is None:
-        return None
-    else:
-        assert element.tag == "identifiers"
-        return Identifiers(
-            lis_id=get_text_or_none(element.find("lisID")),
-            bioguide_id=get_text_or_none(element.find("bioguideId")),
-            gpo_id=get_text_or_none(element.find("gpoId")),
-        )
+    @classmethod
+    def from_xel(cls, xel: Optional[Element]) -> Optional[Identifiers]:
+        if xel is None:
+            return None
+        else:
+            assert xel.tag == "identifiers"
+            return cls(
+                lis_id=get_text_or_none(xel.find("lisID")),
+                bioguide_id=get_text_or_none(xel.find("bioguideId")),
+                gpo_id=get_text_or_none(xel.find("gpoId")),
+            )
 
 
 class Sponsor(BaseModel):
@@ -269,33 +278,33 @@ class Sponsor(BaseModel):
     district: Optional[str] = None
     is_by_request: Optional[str] = None
 
-
-def get_sponsors(element: Element) -> list[Sponsor]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[Sponsor]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "sponsors"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            # some amendment sponsors have only a name like "Rules Committee"
+            # skip these for now
+            if [el.tag for el in item] == ["name"]:
+                continue
+            sponsor = cls(
+                bioguide_id=get_text_or_none(item.find("bioguideId")),
+                full_name=get_text_or_none(item.find("fullName")),
+                first_name=get_text_or_none(item.find("firstName")),
+                last_name=get_text_or_none(item.find("lastName")),
+                party=get_text_or_none(item.find("party")),
+                state=get_text_or_none(item.find("state")),
+                middle_name=get_text_or_none(item.find("middleName")),
+                district=get_text_or_none(item.find("district")),
+                is_by_request=get_text_or_none(item.find("isByRequest")),
+                identifiers=Identifiers.from_xel(item.find("identifiers")),
+            )
+            result.append(sponsor)
         return result
-    assert element.tag == "sponsors"
-    for item in element:
-        if item.tag != "item":
-            continue
-        # some amendment sponsors have only a name like "Rules Committee"
-        # skip these for now
-        if [el.tag for el in item] == ["name"]:
-            continue
-        sponsor = Sponsor(
-            bioguide_id=get_text_or_none(item.find("bioguideId")),
-            full_name=get_text_or_none(item.find("fullName")),
-            first_name=get_text_or_none(item.find("firstName")),
-            last_name=get_text_or_none(item.find("lastName")),
-            party=get_text_or_none(item.find("party")),
-            state=get_text_or_none(item.find("state")),
-            middle_name=get_text_or_none(item.find("middleName")),
-            district=get_text_or_none(item.find("district")),
-            is_by_request=get_text_or_none(item.find("isByRequest")),
-            identifiers=get_identifiers(item.find("identifiers")),
-        )
-        result.append(sponsor)
-    return result
 
 
 class Cosponsor(BaseModel):
@@ -310,29 +319,31 @@ class Cosponsor(BaseModel):
     sponsorship_date: datetime.date
     is_original_cosponsor: bool
 
-
-def get_cosponsors(element: Element) -> list[Cosponsor]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[Cosponsor]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "cosponsors"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            cosponsor = cls(
+                bioguide_id=get_text_or_none(item.find("bioguideId")),
+                full_name=get_text_or_none(item.find("fullName")),
+                first_name=get_text_or_none(item.find("firstName")),
+                last_name=get_text_or_none(item.find("lastName")),
+                party=get_text_or_none(item.find("party")),
+                state=get_text_or_none(item.find("state")),
+                middle_name=get_text_or_none(item.find("middleName")),
+                district=get_text_or_none(item.find("district")),
+                sponsorship_date=get_text_or_none(item.find("sponsorshipDate")),
+                is_original_cosponsor=get_text_or_none(
+                    item.find("isOriginalCosponsor")
+                ),
+            )
+            result.append(cosponsor)
         return result
-    assert element.tag == "cosponsors"
-    for item in element:
-        if item.tag != "item":
-            continue
-        cosponsor = Cosponsor(
-            bioguide_id=get_text_or_none(item.find("bioguideId")),
-            full_name=get_text_or_none(item.find("fullName")),
-            first_name=get_text_or_none(item.find("firstName")),
-            last_name=get_text_or_none(item.find("lastName")),
-            party=get_text_or_none(item.find("party")),
-            state=get_text_or_none(item.find("state")),
-            middle_name=get_text_or_none(item.find("middleName")),
-            district=get_text_or_none(item.find("district")),
-            sponsorship_date=get_text_or_none(item.find("sponsorshipDate")),
-            is_original_cosponsor=get_text_or_none(item.find("isOriginalCosponsor")),
-        )
-        result.append(cosponsor)
-    return result
 
 
 class CboCostEstimate(BaseModel):
@@ -341,86 +352,86 @@ class CboCostEstimate(BaseModel):
     url: str
     description: Optional[str]
 
-
-def get_cbo_cost_estimates(element: Element) -> list[CboCostEstimate]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[CboCostEstimate]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "cboCostEstimates"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            cbo_cost_estimate = cls(
+                pub_date=get_text_or_none(item.find("pubDate")),
+                title=get_text_or_none(item.find("title")),
+                url=get_text_or_none(item.find("url")),
+                description=get_text_or_none(item.find("description")),
+            )
+            result.append(cbo_cost_estimate)
         return result
-    assert element.tag == "cboCostEstimates"
-    for item in element:
-        if item.tag != "item":
-            continue
-        cbo_cost_estimate = CboCostEstimate(
-            pub_date=get_text_or_none(item.find("pubDate")),
-            title=get_text_or_none(item.find("title")),
-            url=get_text_or_none(item.find("url")),
-            description=get_text_or_none(item.find("description")),
-        )
-        result.append(cbo_cost_estimate)
-    return result
 
 
 class Law(BaseModel):
     type: str
     number: str
 
-
-def get_laws(element: Element) -> list[CboCostEstimate]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[CboCostEstimate]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "laws"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            law = cls(
+                type=get_text_or_none(item.find("type")),
+                number=get_text_or_none(item.find("number")),
+            )
+            result.append(law)
         return result
-    assert element.tag == "laws"
-    for item in element:
-        if item.tag != "item":
-            continue
-        law = Law(
-            type=get_text_or_none(item.find("type")),
-            number=get_text_or_none(item.find("number")),
-        )
-        result.append(law)
-    return result
 
 
 class Link(BaseModel):
     name: str
     url: str
 
-
-def get_links(element: Element) -> list[Link]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[Link]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "links"
+        for item in xel:
+            if item.tag != "link":
+                continue
+            link = cls(
+                name=get_text_or_none(item.find("name")),
+                url=get_text_or_none(item.find("url")),
+            )
+            result.append(link)
         return result
-    assert element.tag == "links"
-    for item in element:
-        if item.tag != "link":
-            continue
-        link = Link(
-            name=get_text_or_none(item.find("name")),
-            url=get_text_or_none(item.find("url")),
-        )
-        result.append(link)
-    return result
 
 
 class Note(BaseModel):
     text: str
     links: list[Link]
 
-
-def get_notes(element: Element) -> list[Note]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[Note]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "notes"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            note = cls(
+                text=get_text_or_none(item.find("text")),
+                links=Link.list_from_xel(item.find("links")),
+            )
+            result.append(note)
         return result
-    assert element.tag == "notes"
-    for item in element:
-        if item.tag != "item":
-            continue
-        note = Note(
-            text=get_text_or_none(item.find("text")),
-            links=get_links(item.find("links")),
-        )
-        result.append(note)
-    return result
 
 
 class AmendedBill(BaseModel):
@@ -430,106 +441,105 @@ class AmendedBill(BaseModel):
     origin_chamber_code: str
     number: int
     title: str
-    update_date_including_text: datetime.datetime
+    update_date_including_text: Optional[datetime.datetime]
+
+    @classmethod
+    def from_xel(cls, xel: Element) -> Optional[AmendedBill]:
+        if xel is None:
+            return None
+        else:
+            assert xel.tag == "amendedBill"
+            return cls(
+                congress=xel.find("congress").text,
+                type=get_text_or_none(xel.find("type")),
+                origin_chamber=xel.find("originChamber").text,
+                origin_chamber_code=get_text_or_none(xel.find("originChamberCode")),
+                number=get_text_or_none(xel.find("number")),
+                title=xel.find("title").text,
+                update_date_including_text=get_text_or_none(
+                    xel.find("updateDateIncludingText")
+                ),
+            )
 
 
-def get_amended_bill(element: Element) -> Optional[AmendedBill]:
-    if element is None:
-        return None
-    else:
-        assert element.tag == "amendedBill"
-        return AmendedBill(
-            congress=element.find("congress").text,
-            type=get_text_or_none(element.find("type")),
-            origin_chamber=element.find("originChamber").text,
-            origin_chamber_code=get_text_or_none(element.find("originChamberCode")),
-            number=get_text_or_none(element.find("number")),
-            title=element.find("title").text,
-            update_date_including_text=get_text_or_none(
-                element.find("updateDateIncludingText")
-            ),
-        )
-
-
-class RecordedVote(BaseModel): 
+class RecordedVote(BaseModel):
     roll_number: int
     chamber: str
     congress: int
     date: datetime.datetime
     session_number: int
-    url: str
+    url: Optional[str]
 
-
-def get_recorded_votes(element: Element) -> list[RecordedVote]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[RecordedVote]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "recordedVotes"
+        for item in xel:
+            if item.tag != "recordedVote":
+                continue
+            recorded_vote = cls(
+                roll_number=get_text_or_none(item.find("rollNumber")),
+                chamber=get_text_or_none(item.find("chamber")),
+                congress=get_text_or_none(item.find("congress")),
+                date=get_text_or_none(item.find("date")),
+                session_number=get_text_or_none(item.find("sessionNumber")),
+                url=get_text_or_none(item.find("url")),
+            )
+            result.append(recorded_vote)
         return result
-    assert element.tag == "recordedVotes"
-    for item in element:
-        if item.tag != "recordedVote":
-            continue
-        recorded_vote = RecordedVote(
-            roll_number=get_text_or_none(item.find("rollNumber")),
-            chamber=get_text_or_none(item.find("chamber")),
-            congress=get_text_or_none(item.find("congress")),
-            date=get_text_or_none(item.find("date")),
-            session_number=get_text_or_none(item.find("sessionNumber")),
-            url = get_text_or_none(item.find("url")),
-        )
-        result.append(recorded_vote)
-    return result
 
 
 class ActionAmendment(BaseModel):
     action_date: datetime.date
     text: Optional[str]
-    action_time: Optional[str]=None
+    action_time: Optional[str] = None
     links: list[Link]
-    type: Optional[str]=None
-    action_code: Optional[str]=None
-    source_system: Optional[SourceSystem]=None
-    recorded_votes: Optional[list[RecordedVote]]=[]
+    type: Optional[str] = None
+    action_code: Optional[str] = None
+    source_system: Optional[SourceSystem] = None
+    recorded_votes: Optional[list[RecordedVote]] = []
 
+    @classmethod
+    def from_xel(cls, xel: Element) -> ActionAmendment:
+        if xel is None:
+            return None
+        else:
+            assert xel.tag == "latestAction"
+            return cls(
+                action_date=get_text_or_none(xel.find("actionDate")),
+                text=get_text_or_none(xel.find("text")),
+                action_time=get_text_or_none(xel.find("actionTime")),
+                links=Link.list_from_xel(xel.find("links")),
+            )
 
-def get_latest_action(element: Element) -> ActionAmendment:
-    if element is None:
-        return None
-    else:
-        assert element.tag == "latestAction"
-        return ActionAmendment(
-            action_date=get_text_or_none(element.find("actionDate")),
-            text=get_text_or_none(element.find("text")),
-            action_time=get_text_or_none(element.find("actionTime")),
-            links=get_links(element.find("links")),
-        )
+    @classmethod
+    def list_from_xel(cls, xel_outer: Element) -> list[ActionAmendment]:
+        result = []
+        if xel_outer is None:
+            return result
+        assert xel_outer.tag == "actions"
+        count = int(xel_outer.find("count").text)
+        xel = xel_outer.find("actions")
+        if xel is None:
+            return result
 
-
-def get_actions_amendments(element_outer: Element) -> list[ActionAmendment]:
-    result = []
-    if element_outer is None:
+        for item in xel:
+            if item.tag != "item":
+                continue
+            action_amendment = cls(
+                action_date=get_text_or_none(item.find("actionDate")),
+                action_time=get_text_or_none(item.find("actionTime")),
+                text=get_text_or_none(item.find("text")),
+                type=get_text_or_none(item.find("type")),
+                action_code=get_text_or_none(item.find("actionCode")),
+                source_system=SourceSystem.from_xel(item.find("sourceSystem")),
+                recorded_votes=RecordedVote.list_from_xel(item.find("recordedVotes")),
+                links=Link.list_from_xel(item.find("links")),
+            )
+            result.append(action_amendment)
         return result
-    assert element_outer.tag == "actions"
-    count = int(element_outer.find("count").text)
-    element = element_outer.find("actions")
-    if element is None:
-        return result
-
-    for item in element:
-        if item.tag != "item":
-            continue
-        action_amendment = ActionAmendment(
-            action_date=get_text_or_none(item.find("actionDate")),
-            action_time=get_text_or_none(item.find("actionTime")),
-            text=get_text_or_none(item.find("text")),
-            type=get_text_or_none(item.find("type")),
-            action_code=get_text_or_none(item.find("actionCode")),
-            source_system = get_source_system(item.find("sourceSystem")),
-            recorded_votes = get_recorded_votes(item.find("recordedVotes")),
-            links=get_links(item.find("links")),
-
-        )
-        result.append(action_amendment)
-    return result
 
 
 class Amendment(BaseModel):
@@ -546,33 +556,32 @@ class Amendment(BaseModel):
     links: list[Link]
     actions: list[ActionAmendment]
 
-
-def get_amendments(element: Element) -> list[Amendment]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Element) -> list[Amendment]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "amendments"
+        for item in xel:
+            if item.tag != "amendment":
+                continue
+            amendment = cls(
+                number=get_text_or_none(item.find("number")),
+                congress=get_text_or_none(item.find("congress")),
+                type=get_text_or_none(item.find("type")),
+                description=get_text_or_none(item.find("description")),
+                purpose=get_text_or_none(item.find("purpose")),
+                update_date=get_text_or_none(item.find("updateDate")),
+                latest_action=ActionAmendment.from_xel(item.find("latestAction")),
+                sponsors=Sponsor.list_from_xel(item.find("sponsors")),
+                submitted_date=get_text_or_none(item.find("submittedDate")),
+                chamber=get_text_or_none(item.find("chamber")),
+                amended_bill=AmendedBill.from_xel(item.find("amendedBill")),
+                links=Link.list_from_xel(item.find("links")),
+                actions=ActionAmendment.list_from_xel(item.find("actions")),
+            )
+            result.append(amendment)
         return result
-    assert element.tag == "amendments"
-    for item in element:
-        if item.tag != "amendment":
-            continue
-        amendment = Amendment(
-            number=get_text_or_none(item.find("number")),
-            congress=get_text_or_none(item.find("congress")),
-            type=get_text_or_none(item.find("type")),
-            description=get_text_or_none(item.find("description")),
-            purpose=get_text_or_none(item.find("purpose")),
-            update_date=get_text_or_none(item.find("updateDate")),
-            latest_action = get_latest_action(item.find("latestAction")),
-            sponsors = get_sponsors(item.find("sponsors")),
-            submitted_date = get_text_or_none(item.find("submittedDate")),
-            chamber = get_text_or_none(item.find("chamber")),
-            amended_bill = get_amended_bill(item.find("amendedBill")),
-            links = get_links(item.find("links")),
-            actions = get_actions_amendments(item.find("actions")),
-        )
-        result.append(amendment)
-    return result
-
 
 
 class TextVersionBillStatus(BaseModel):
@@ -580,19 +589,16 @@ class TextVersionBillStatus(BaseModel):
     date: Optional[datetime.datetime] = None
     url: Optional[str] = None
 
-
-def get_text_versions(element: Optional[Element]) -> list[TextVersionBillStatus]:
-    result = []
-    if element is None:
-        return result
-    assert element.tag == "textVersions"
-    for item in element:
-        if item.tag != "item":
-            continue
-        formats = get_formats(item.find("formats"))
-        if formats is None:
-            url = None
-        else:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[TextVersionBillStatus]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "textVersions"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            formats = Format.list_from_xel(item.find("formats"))
             urls = list(set([el.url for el in formats]))
             if len(urls) == 0:
                 url = None
@@ -601,36 +607,36 @@ def get_text_versions(element: Optional[Element]) -> list[TextVersionBillStatus]
             elif len(urls) > 1:
                 raise ValueError("len(urls)>1")
 
-        tv_type = get_text_or_none(item.find("type"))
-        tv_date = get_text_or_none(item.find("date"))
+            tv_type = get_text_or_none(item.find("type"))
+            tv_date = get_text_or_none(item.find("date"))
 
-        if url is None and tv_type is None and tv_date is None:
-            continue
-        else:
-            text_version = TextVersionBillStatus(
-                type=tv_type,
-                date=tv_date,
-                url=url,
-            )
-            result.append(text_version)
-    return result
+            if url is None and tv_type is None and tv_date is None:
+                continue
+            else:
+                text_version = cls(
+                    type=tv_type,
+                    date=tv_date,
+                    url=url,
+                )
+                result.append(text_version)
+        return result
 
 
 class Format(BaseModel):
     url: str
 
-
-def get_formats(element: Optional[Element]) -> list[Format]:
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[Format]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "formats"
+        for item in xel:
+            if item.tag != "item":
+                continue
+            el = cls(url=get_text_or_none(item.find("url")))
+            result.append(el)
         return result
-    assert element.tag == "formats"
-    for item in element:
-        if item.tag != "item":
-            continue
-        el = Format(url=get_text_or_none(item.find("url")))
-        result.append(el)
-    return result
 
 
 class Summary(BaseModel):
@@ -640,24 +646,24 @@ class Summary(BaseModel):
     update_date: datetime.datetime
     text: str
 
-
-def get_summaries(element: Optional[Element]):
-    result = []
-    if element is None:
+    @classmethod
+    def list_from_xel(cls, xel: Optional[Element]) -> list[Summary]:
+        result = []
+        if xel is None:
+            return result
+        assert xel.tag == "summaries"
+        for item in xel:
+            if item.tag != "summary":
+                continue
+            summary = cls(
+                version_code=get_text_or_none(item.find("versionCode")),
+                action_date=get_text_or_none(item.find("actionDate")),
+                action_desc=get_text_or_none(item.find("actionDesc")),
+                update_date=get_text_or_none(item.find("updateDate")),
+                text=get_text_or_none(item.find("text")),
+            )
+            result.append(summary)
         return result
-    assert element.tag == "summaries"
-    for item in element:
-        if item.tag != "summary":
-            continue
-        summary = Summary(
-            version_code=get_text_or_none(item.find("versionCode")),
-            action_date=get_text_or_none(item.find("actionDate")),
-            action_desc=get_text_or_none(item.find("actionDesc")),
-            update_date=get_text_or_none(item.find("updateDate")),
-            text=get_text_or_none(item.find("text")),
-        )
-        result.append(summary)
-    return result
 
 
 class DublinCoreBillStatus(BaseModel):
@@ -667,17 +673,17 @@ class DublinCoreBillStatus(BaseModel):
     dc_contributor: str
     dc_description: str
 
-
-def get_dublin_core(element: Element):
-    assert element.tag == "dublinCore"
-    ns = {"dc": "http://purl.org/dc/elements/1.1/"}
-    return DublinCoreBillStatus(
-        dc_format=element.find("dc:format", namespaces=ns).text,
-        dc_language=element.find("dc:language", namespaces=ns).text,
-        dc_rights=element.find("dc:rights", namespaces=ns).text,
-        dc_contributor=element.find("dc:contributor", namespaces=ns).text,
-        dc_description=element.find("dc:description", namespaces=ns).text,
-    )
+    @classmethod
+    def from_xel(cls, xel: Element):
+        assert xel.tag == "dublinCore"
+        ns = {"dc": "http://purl.org/dc/elements/1.1/"}
+        return cls(
+            dc_format=xel.find("dc:format", namespaces=ns).text,
+            dc_language=xel.find("dc:language", namespaces=ns).text,
+            dc_rights=xel.find("dc:rights", namespaces=ns).text,
+            dc_contributor=xel.find("dc:contributor", namespaces=ns).text,
+            dc_description=xel.find("dc:description", namespaces=ns).text,
+        )
 
 
 def get_number(bill: Element) -> int:
@@ -714,32 +720,32 @@ def get_type(bill: Element) -> str:
         return btype.text
 
 
-def get_legislative_subjects(element: Optional[Element]) -> list[str]:
+def get_legislative_subjects(xel: Optional[Element]) -> list[str]:
     result = []
-    if element is None:
+    if xel is None:
         return result
-    assert element.tag == "legislativeSubjects"
-    for item in element:
+    assert xel.tag == "legislativeSubjects"
+    for item in xel:
         if item.tag != "item":
             continue
         result.append(get_text_or_none(item.find("name")))
     return result
 
 
-def get_subjects(element: Optional[Element]) -> list[str]:
+def get_subjects(xel: Optional[Element]) -> list[str]:
     result = []
-    if element is None:
+    if xel is None:
         return result
-    assert element.tag == "subjects"
-    result = get_legislative_subjects(element.find("legislativeSubjects"))
+    assert xel.tag == "subjects"
+    result = get_legislative_subjects(xel.find("legislativeSubjects"))
     return result
 
 
-def get_policy_area(element: Optional[Element]) -> Optional[str]:
-    if element is None:
+def get_policy_area(xel: Optional[Element]) -> Optional[str]:
+    if xel is None:
         return None
-    assert element.tag == "policyArea"
-    return get_text_or_none(element.find("name"))
+    assert xel.tag == "policyArea"
+    return get_text_or_none(xel.find("name"))
 
 
 class BillStatus(BaseModel):
@@ -790,45 +796,62 @@ class BillStatus(BaseModel):
             type=get_type(bill),
             introduced_date=bill.find("introducedDate").text,
             congress=bill.find("congress").text,
-            committees=get_committees(bill.find("committees")),
-            committee_reports=get_committee_reports(bill.find("committeeReports")),
-            related_bills=get_related_bills(bill.find("relatedBills")),
-            actions=get_actions(bill.find("actions")),
-            sponsors=get_sponsors(bill.find("sponsors")),
-            cosponsors=get_cosponsors(bill.find("cosponsors")),
-            laws=get_laws(bill.find("laws")),
-            notes=get_notes(bill.find("notes")),
-            cbo_cost_estimates=get_cbo_cost_estimates(bill.find("cboCostEstimates")),
+            committees=Committee.list_from_xel(bill.find("committees")),
+            committee_reports=CommitteeReport.list_from_xel(
+                bill.find("committeeReports")
+            ),
+            related_bills=RelatedBill.list_from_xel(bill.find("relatedBills")),
+            actions=Action.list_from_xel(bill.find("actions")),
+            sponsors=Sponsor.list_from_xel(bill.find("sponsors")),
+            cosponsors=Cosponsor.list_from_xel(bill.find("cosponsors")),
+            laws=Law.list_from_xel(bill.find("laws")),
+            notes=Note.list_from_xel(bill.find("notes")),
+            cbo_cost_estimates=CboCostEstimate.list_from_xel(
+                bill.find("cboCostEstimates")
+            ),
             policy_area=get_policy_area(bill.find("policyArea")),
             subjects=get_subjects(bill.find("subjects")),
-            summaries=get_summaries(bill.find("summaries")),
+            summaries=Summary.list_from_xel(bill.find("summaries")),
             title=bill.find("title").text,
-            titles=get_titles(bill.find("titles")),
-            amendments=get_amendments(bill.find("amendments")),
-            text_versions=get_text_versions(bill.find("textVersions")),
-            latest_action=get_action(bill.find("latestAction")),
-            dublin_core=get_dublin_core(root.find("dublinCore")),
+            titles=Title.list_from_xel(bill.find("titles")),
+            amendments=Amendment.list_from_xel(bill.find("amendments")),
+            text_versions=TextVersionBillStatus.list_from_xel(
+                bill.find("textVersions")
+            ),
+            latest_action=Action.from_xel(bill.find("latestAction")),
+            dublin_core=DublinCoreBillStatus.from_xel(root.find("dublinCore")),
         )
+
+
+def count_tags(xmls: list[str]) -> Counter:
+    tags = Counter()
+    for xml in xmls:
+        bill = ET.fromstring(xml).find("bill")
+        for xel in bill:
+            tags[xel.tag] += 1
+    return tags
 
 
 if __name__ == "__main__":
 
+    """
+    constitutionalAuthorityStatementText
+
+    cdata
+
+    """
+
     import pandas as pd
     import rich
-    from collections import Counter
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
-    xml_file_path = congress_hf_path / "usc-109-billstatus.parquet"
-    df = pd.read_parquet(xml_file_path)
-    tags = Counter()
-    for _, row in df.iterrows():
-        xml = row["xml"]
-        bs = BillStatus.from_xml_str(xml)
-
-        bill = ET.fromstring(xml).find("bill")
-        for element in bill:
-            tags[element.tag] += 1
-#            if element.tag == "amendments":
-#                sys.exit(0)
-
-
+    #    for cn in range(109, 119):
+    for cn in range(117, 118):
+        print(cn)
+        xml_file_path = congress_hf_path / f"usc-{cn}-billstatus.parquet"
+        df = pd.read_parquet(xml_file_path)
+        tags = count_tags(df["xml"].tolist())
+        print(tags.most_common())
+        for _, row in df.iterrows():
+            xml = row["xml"]
+            bs = BillStatus.from_xml_str(xml)
