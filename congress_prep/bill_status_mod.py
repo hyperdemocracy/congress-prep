@@ -6,6 +6,7 @@ https://www.congress.gov/help/legislative-glossary
 from __future__ import annotations
 from collections import Counter
 import datetime
+import json
 from pathlib import Path
 from typing import Optional
 import xml.etree.ElementTree as ET
@@ -834,20 +835,14 @@ def count_tags(xmls: list[str]) -> Counter:
 
 if __name__ == "__main__":
 
-    """
-    constitutionalAuthorityStatementText
-
-    cdata
-
-    """
-
     import pandas as pd
     import rich
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
-    for cn in range(109, 119):
-#    for cn in range(117, 118):
+#    for cn in range(109, 119):
+    for cn in range(113, 114):
         print(cn)
+        bss = []
         xml_file_path = congress_hf_path / f"usc-{cn}-billstatus.parquet"
         df = pd.read_parquet(xml_file_path)
         tags = count_tags(df["xml"].tolist())
@@ -855,3 +850,6 @@ if __name__ == "__main__":
         for _, row in df.iterrows():
             xml = row["xml"]
             bs = BillStatus.from_xml_str(xml)
+            # make everything serializable
+            bss.append(json.loads(bs.model_dump_json()))
+        df_bss = pd.DataFrame(bss)
