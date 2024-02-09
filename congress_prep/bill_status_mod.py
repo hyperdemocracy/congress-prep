@@ -675,7 +675,7 @@ class DublinCoreBillStatus(BaseModel):
     dc_description: str
 
     @classmethod
-    def from_xel(cls, xel: Element):
+    def from_xel(cls, xel: Element) -> DublinCoreBillStatus:
         assert xel.tag == "dublinCore"
         ns = {"dc": "http://purl.org/dc/elements/1.1/"}
         return cls(
