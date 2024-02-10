@@ -86,7 +86,7 @@ def dataframe_from_scrape_files(base_path: Union[str, Path]) -> pd.DataFrame:
     return df
 
 
-def write_scrape_local(base_path: Union[str, Path]):
+def write_local(base_path: Union[str, Path]):
     """Write local parquet files
 
     base_path: scraper output directory. should contain "data" and "cache" as sub-directories
@@ -152,7 +152,7 @@ def write_scrape_local(base_path: Union[str, Path]):
                 df_out.to_parquet(fpath)
 
 
-def upload_scrape_to_hf(base_path: Union[str, Path], congress_nums: list[int]):
+def upload_hf(base_path: Union[str, Path], congress_nums: list[int]):
     """Upload scraped xml files to huggingface
 
     Creates or updates two huggingface datasets per congress num.
@@ -218,8 +218,8 @@ if __name__ == "__main__":
 #    df = dataframe_from_scrape_files(base_path)
 
 # to write local parquet files
-#    write_scrape_local(base_path)
+#    write_local(base_path)
 
 # to upload to HF
 #    congress_nums = list(range(109, 119))
-#    upload_scrape_to_hf(base_path, congress_nums)
+#    upload_hf(base_path, congress_nums)
