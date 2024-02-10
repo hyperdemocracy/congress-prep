@@ -78,9 +78,13 @@ def join_bs_tv(congress_num: int, upload: bool=False):
 
         urow = bs_row.to_dict()
         urow["text_versions"] = tvs
+        urow["latest_text_id"] = urow['text_versions'][0]['text_id'] if len(urow['text_versions']) > 0 else None
         dfu.append(urow)
 
     dfu = pd.DataFrame(dfu)
+    col = dfu.pop("latest_text_id")
+    dfu.insert(1, col.name, col)
+
     fout = congress_hf_path / f"usc-{congress_num}-unified-v1.parquet"
     dfu.to_parquet(fout)
 
