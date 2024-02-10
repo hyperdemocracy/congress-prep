@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Union
 
 from datasets import load_dataset
 from langchain_core.documents import Document
@@ -8,18 +9,22 @@ import rich
 import pandas as pd
 
 
-def split_dataset(cn: int, chunk_size: int, chunk_overlap: int, use_local_data=True):
+def write_local(
+    congress_hf_path: Union[str, Path],
+    congress_num: int,
+    chunk_size: int,
+    chunk_overlap: int,
+):
 
-    if use_local_data:
-        congress_hf_path = Path("/Users/galtay/data/congress-hf")
-        df_path = congress_hf_path / f"usc-{cn}-unified-v1.parquet"
-        rich.print(df_path)
-        df_in = pd.read_parquet(df_path)
-    else:
-        ds_name = f"hyperdemocracy/usc-{cn}-unified-v1"
-        rich.print(ds_name)
-        ds = load_dataset(ds_name, split="train")
-        df_in = ds.to_pandas()
+    congress_hf_path = Path(congress_hf_path)
+    rich.print(f"{congress_hf_path=}")
+    rich.print(f"{congress_num=}")
+    rich.print(f"{chunk_size=}")
+    rich.print(f"{chunk_overlap=}")
+
+    df_path = congress_hf_path / f"usc-{congress_num}-unified-v1.parquet"
+    rich.print(df_path)
+    df_in = pd.read_parquet(df_path)
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -69,11 +74,7 @@ def split_dataset(cn: int, chunk_size: int, chunk_overlap: int, use_local_data=T
             doc.metadata["text_id"],
             chunk_indx,
         )
-        #        dd = json.dumps({
-        #            "page_content": doc.page_content,
-        #            "metadata": doc.metadata,
-        #        })
-        #        fp.write(f"{dd}\n")
+
         cur_text_id = doc.metadata["text_id"]
 
     df_out = pd.DataFrame.from_records(
@@ -87,18 +88,51 @@ def split_dataset(cn: int, chunk_size: int, chunk_overlap: int, use_local_data=T
         ]
     )
 
-    fout = congress_hf_path / f"usc-{cn}-chunks-v1-s{chunk_size}-o{chunk_overlap}.parquet"
+    fout = (
+        congress_hf_path
+        / f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}.parquet"
+    )
     df_out.to_parquet(fout)
 
 
-if __name__ == "__main__":
-    """
-    Expected IDs to be unique, found duplicates of: 113-publ-76-None-565374, 113-publ-76-None-803979
-    """
+def upload_hf(
+    congress_hf_path: Union[str, Path],
+    congress_num: int,
+    chunk_size: int,
+    chunk_overlap: int,
+):
 
-    cns = [113, 114, 115, 116, 117, 118]
+    congress_hf_path = Path(congress_hf_path)
+    rich.print(f"{congress_hf_path=}")
+    rich.print(f"{congress_num=}")
+    rich.print(f"{chunk_size=}")
+    rich.print(f"{chunk_overlap=}")
+
+    tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
+    fpath = congress_hf_path / f"{tag}.parquet"
+    if fpath.exists():
+        api = HfApi()
+        repo_id = f"hyperdemocracy/{tag}"
+        rich.print(f"{repo_id=}")
+        api.create_repo(
+            repo_id=repo_id,
+            repo_type="dataset",
+            exist_ok=True,
+        )
+        api.upload_file(
+            path_or_fileobj=fout,
+            path_in_repo=fout.name,
+            repo_id=repo_id,
+            repo_type="dataset",
+        )
+
+
+if __name__ == "__main__":
+
+    congress_hf_path = Path("/Users/galtay/data/congress-hf")
     chunk_size = 1024
     chunk_overlap = 256
-
-    for cn in cns:
-        split_dataset(cn, chunk_size, chunk_overlap)
+    congress_nums = [113, 114, 115, 116, 117, 118]
+    for congress_num in congress_nums:
+        write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
+#        upload_hf(congress_hf_path, congress_num, chunk_size, chunk_overlap)

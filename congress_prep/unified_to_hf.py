@@ -2,9 +2,11 @@
 Gather all text versions for a given bill status row.
 Create plain text from xml
 """
+
 from collections import Counter
 import datetime
 import json
+from typing import Union
 
 from huggingface_hub import HfApi
 from pathlib import Path
@@ -15,14 +17,21 @@ from bill_status_mod import BillStatus
 from textversions_mod import get_bill_text_v1
 
 
-def join_bs_tv(congress_num: int, upload: bool=False):
+def write_local(congress_hf_path: Union[str, Path], congress_num: int):
 
-    print(f"{congress_num=}")
+    congress_hf_path = Path(congress_hf_path)
+    rich.print(f"{congress_hf_path=}")
+    rich.print(f"{congress_num=}")
 
-    df_bs = pd.read_parquet(congress_hf_path / f"usc-{congress_num}-billstatus-parsed.parquet")
+    df_bs = pd.read_parquet(
+        congress_hf_path / f"usc-{congress_num}-billstatus-parsed.parquet"
+    )
     assert df_bs["legis_id"].nunique() == df_bs.shape[0]
 
-    df_tvs = pd.read_parquet(congress_hf_path / f"usc-{congress_num}-textversions.parquet")
+    df_tvs = pd.read_parquet(
+        congress_hf_path / f"usc-{congress_num}-textversions-ddt-xml.parquet"
+    )
+    assert df_tvs["text_id"].nunique() == df_tvs.shape[0]
     missing_tvs = Counter()
 
     dfu = []
@@ -65,20 +74,25 @@ def join_bs_tv(congress_num: int, upload: bool=False):
             tv["text_v1"] = get_bill_text_v1(xml)
             tvs.append(tv)
 
-
         # sort all text versions for a bill by date.
         # most recent in front of list and date=None at the end
         tvs = sorted(
             tvs,
-            key=lambda x: x["bs_date"]
-            if x["bs_date"] is not None
-            else datetime.datetime.min.isoformat(),
+            key=lambda x: (
+                x["bs_date"]
+                if x["bs_date"] is not None
+                else datetime.datetime.min.isoformat()
+            ),
             reverse=True,
         )
 
         urow = bs_row.to_dict()
         urow["text_versions"] = tvs
-        urow["latest_text_id"] = urow['text_versions'][0]['text_id'] if len(urow['text_versions']) > 0 else None
+        urow["latest_text_id"] = (
+            urow["text_versions"][0]["text_id"]
+            if len(urow["text_versions"]) > 0
+            else None
+        )
         dfu.append(urow)
 
     dfu = pd.DataFrame(dfu)
@@ -88,9 +102,18 @@ def join_bs_tv(congress_num: int, upload: bool=False):
     fout = congress_hf_path / f"usc-{congress_num}-unified-v1.parquet"
     dfu.to_parquet(fout)
 
-    if upload:
+
+def upload_hf(congress_hf_path: Union[str, Path], congress_num: int):
+
+    congress_hf_path = Path(congress_hf_path)
+    rich.print(f"{congress_hf_path=}")
+    rich.print(f"{congress_num=}")
+
+    tag = f"usc-{congress_num}-unified-v1"
+    fpath = congress_hf_path / f"{tag}.parquet"
+    if fpath.exists():
         api = HfApi()
-        repo_id = f"hyperdemocracy/usc-{congress_num}-unified-v1"
+        repo_id = f"hyperdemocracy/{tag}"
         rich.print(f"{repo_id=}")
         api.create_repo(
             repo_id=repo_id,
@@ -110,5 +133,5 @@ if __name__ == "__main__":
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     congress_nums = [113, 114, 115, 116, 117, 118]
     for congress_num in congress_nums:
-        join_bs_tv(congress_num, upload=True)
-
+        write_local(congress_hf_path, congress_num)
+#        upload_hf(congress_hf_path, congress_num)

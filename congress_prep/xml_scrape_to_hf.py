@@ -19,13 +19,15 @@ FILE_PATTERN = re.compile(
 )
 
 
-def dataframe_from_scrape_files(base_path: Union[str, Path]) -> pd.DataFrame:
+def dataframe_from_scrape_files(
+    congress_scraper_path: Union[str, Path]
+) -> pd.DataFrame:
     """Read all scraped XML files into a DataFrame
 
-    base_path: scraper output directory. should contain "data" and "cache" as sub-directories
+    congress_scraper_path: scraper output directory. should contain "data" and "cache" as sub-directories
     """
 
-    data_path = Path(base_path) / "data"
+    data_path = Path(congress_scraper_path) / "data"
     names = Counter()
 
     rows = []
@@ -33,7 +35,7 @@ def dataframe_from_scrape_files(base_path: Union[str, Path]) -> pd.DataFrame:
         if path_object.suffix != ".xml":
             continue
 
-        path_str = str(path_object.relative_to(base_path))
+        path_str = str(path_object.relative_to(congress_scraper_path))
         if path_object.name == "fdsys_billstatus.xml":
             file_type = "billstatus"
             legis_version = None
@@ -86,15 +88,15 @@ def dataframe_from_scrape_files(base_path: Union[str, Path]) -> pd.DataFrame:
     return df
 
 
-def write_local(base_path: Union[str, Path]):
+def write_local(congress_scraper_path: Union[str, Path]):
     """Write local parquet files
 
-    base_path: scraper output directory. should contain "data" and "cache" as sub-directories
+    congress_scraper_path: scraper output directory. should contain "data" and "cache" as sub-directories
     """
 
-    base_path = Path(base_path)
-    congress_hf_path = base_path.parent / "congress-hf"
-    df_all = dataframe_from_scrape_files(base_path)
+    congress_scraper_path = Path(congress_scraper_path)
+    congress_hf_path = congress_scraper_path.parent / "congress-hf"
+    df_all = dataframe_from_scrape_files(congress_scraper_path)
 
     for cn, df_cn in df_all.groupby("congress_num"):
 
@@ -152,19 +154,19 @@ def write_local(base_path: Union[str, Path]):
                 df_out.to_parquet(fpath)
 
 
-def upload_hf(base_path: Union[str, Path], congress_nums: list[int]):
+def upload_hf(congress_scraper_path: Union[str, Path], congress_nums: list[int]):
     """Upload scraped xml files to huggingface
 
     Creates or updates two huggingface datasets per congress num.
     One for billstatus metadata and one for textversions.
     Note that this does not upload uslm_xml just the ddt_xml.
 
-    base_path: scraper output directory. should contain "data" and "cache" as sub-directories
+    congress_scraper_path: scraper output directory. should contain "data" and "cache" as sub-directories
     congress_nums: list of congress numbers e.g. [113, 114, 115]
     """
 
-    base_path = Path(base_path)
-    congress_hf_path = base_path.parent / "congress-hf"
+    congress_scraper_path = Path(congress_scraper_path)
+    congress_hf_path = congress_scraper_path.parent / "congress-hf"
     api = HfApi()
     for cn in congress_nums:
 
@@ -212,14 +214,14 @@ def upload_hf(base_path: Union[str, Path], congress_nums: list[int]):
 
 if __name__ == "__main__":
 
-    base_path = Path("/Users/galtay/data/congress-scraper")
+    congress_scraper_path = Path("/Users/galtay/data/congress-scraper")
 
     # to just read the dataframe
-#    df = dataframe_from_scrape_files(base_path)
+#    df = dataframe_from_scrape_files(congress_scraper_path)
 
 # to write local parquet files
-#    write_local(base_path)
+#    write_local(congress_scraper_path)
 
 # to upload to HF
 #    congress_nums = list(range(109, 119))
-#    upload_hf(base_path, congress_nums)
+#    upload_hf(congress_scraper_path, congress_nums)

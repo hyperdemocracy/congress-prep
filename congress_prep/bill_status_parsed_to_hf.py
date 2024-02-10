@@ -10,21 +10,18 @@ from congress_prep.bill_status_mod import BillStatus
 
 
 def write_local(
-    base_path: Union[str, Path],
+    congress_hf_path: Union[str, Path],
     congress_num: int,
 ):
-
     """Write local parquet file
 
-    base_path: scraper output directory. should contain "data" and "cache" as sub-directories
+    congress_hf_path: directory for local parquet files
     congress_num: congress num
     """
 
-    base_path = Path(base_path)
-    congress_hf_path = base_path.parent / "congress-hf"
-
-    rich.print(f"{congress_num=}")
+    congress_hf_path = Path(congress_hf_path)
     rich.print(f"{congress_hf_path=}")
+    rich.print(f"{congress_num=}")
 
     bss = []
     xml_file_path = congress_hf_path / f"usc-{congress_num}-billstatus-xml.parquet"
@@ -42,22 +39,19 @@ def write_local(
         df_hf.to_parquet(fout)
 
 
-
 def upload_hf(
-    base_path: Union[str, Path],
+    congress_hf_path: Union[str, Path],
     congress_num: int,
 ):
     """Upload parsed bill status files to huggingface
 
-    base_path: scraper output directory. should contain "data" and "cache" as sub-directories
+    congress_hf_path: directory for local parquet files
     congress_num: congress num
     """
 
-    base_path = Path(base_path)
-    congress_hf_path = base_path.parent / "congress-hf"
-
-    rich.print(f"{congress_num=}")
+    congress_hf_path = Path(congress_hf_path)
     rich.print(f"{congress_hf_path=}")
+    rich.print(f"{congress_num=}")
 
     tag = f"usc-{congress_num}-billstatus-parsed"
     fpath = congress_hf_path / f"{tag}.parquet"
@@ -78,9 +72,10 @@ def upload_hf(
             repo_type="dataset",
         )
 
+
 if __name__ == "__main__":
 
-    base_path = Path("/Users/galtay/data/congress-scraper")
+    congress_hf_path = Path("/Users/galtay/data/congress-hf")
     for congress_num in range(109, 119):
-        write_local(base_path, congress_num)
-#        upload_hf(base_path, congress_num)
+        write_local(congress_hf_path, congress_num)
+#        upload_hf(congress_hf_path, congress_num)

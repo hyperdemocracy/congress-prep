@@ -90,8 +90,8 @@ class Resolution(BaseModel):
     def from_xel(cls, xel: Optional[Element]) -> Resolution:
         return cls(
             attrs=ResAttrs.from_xel(xel),
-            dublin_core = ResDublinCore.from_xel(xel.find("metadata").find("dublinCore")),
-            form = ResForm.from_xel(xel.find("form")),
+            dublin_core=ResDublinCore.from_xel(xel.find("metadata").find("dublinCore")),
+            form=ResForm.from_xel(xel.find("form")),
         )
 
 
@@ -141,7 +141,6 @@ def get_bill_text_v3(
 
         texts.append(etext)
 
-
     text = "\n\n".join(texts)
     return text
 
@@ -151,7 +150,7 @@ def count_tags(xmls: list[str]) -> Counter:
     for xml in xmls:
         root = ET.fromstring(xml)
         tt = tuple([xel.tag for xel in root])
-        if '{http://schemas.gpo.gov/xml/uslm}meta' in tt:
+        if "{http://schemas.gpo.gov/xml/uslm}meta" in tt:
             sys.exit(0)
         tags[tt] += 1
     return tags
@@ -166,7 +165,6 @@ if __name__ == "__main__":
     tags = count_tags(df_tv_xml["xml"].tolist())
     sys.exit(0)
 
-
     for _, row in df_tv_xml.iterrows():
         xml = row["xml"]
         xml = xml.replace(" & ", " &amp; ")
@@ -179,7 +177,3 @@ if __name__ == "__main__":
         break
         if len(text_v1) > 2048:
             break
-
-
-
-

@@ -18,7 +18,7 @@ def create_index(
     chunk_overlap: int,
     model_name: str,
     model_tag: str,
-    batch_size: int=1000,
+    batch_size: int = 1000,
     nlim: Optional[int] = None,
 ):
 
@@ -33,7 +33,9 @@ def create_index(
         query_instruction="Represent this question for searching relevant passages: ",
     )
 
-    chroma_client = chromadb.PersistentClient(path=str(congress_hf_path / f"{repo_tag}-chromadb"))
+    chroma_client = chromadb.PersistentClient(
+        path=str(congress_hf_path / f"{repo_tag}-chromadb")
+    )
     try:
         chroma_client.delete_collection(name=repo_tag)
     except ValueError:
@@ -54,9 +56,7 @@ def create_index(
 
         metas = df_batch["metadata"].tolist()
         metas = [
-            {
-                k:str(v) if v is None else v for k,v in meta.items()
-            } for meta in metas
+            {k: str(v) if v is None else v for k, v in meta.items()} for meta in metas
         ]
 
         collection.add(
@@ -77,8 +77,12 @@ def load_collection(
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     repo_tag = f"usc-{cn}-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=model_name, normalize_embeddings=True)
-    chroma_client = chromadb.PersistentClient(path=str(congress_hf_path / f"{repo_tag}-chromadb"))
+    ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name=model_name, normalize_embeddings=True
+    )
+    chroma_client = chromadb.PersistentClient(
+        path=str(congress_hf_path / f"{repo_tag}-chromadb")
+    )
     collection = chroma_client.get_collection(name=repo_tag, embedding_function=ef)
     return chroma_client, collection
 
@@ -93,7 +97,9 @@ def load_langchain_db(
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     repo_tag = f"usc-{cn}-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
-    chroma_client = chromadb.PersistentClient(path=str(congress_hf_path / f"{repo_tag}-chromadb"))
+    chroma_client = chromadb.PersistentClient(
+        path=str(congress_hf_path / f"{repo_tag}-chromadb")
+    )
     collection = chroma_client.get_collection(name=repo_tag)
 
     model_kwargs = {"device": "cpu"}
@@ -145,7 +151,7 @@ if __name__ == "__main__":
             chunk_overlap,
             model_name,
             model_tag,
-            batch_size = batch_size,
+            batch_size=batch_size,
             nlim=nlim,
         )
 
