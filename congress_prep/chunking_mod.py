@@ -88,10 +88,8 @@ def write_local(
         ]
     )
 
-    fout = (
-        congress_hf_path
-        / f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}.parquet"
-    )
+    tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
+    fout = congress_hf_path / f"{tag}.parquet"
     df_out.to_parquet(fout)
 
 
