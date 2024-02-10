@@ -4,6 +4,8 @@ Create plain text from xml
 """
 from collections import Counter
 import datetime
+import json
+
 from huggingface_hub import HfApi
 from pathlib import Path
 import pandas as pd
@@ -51,10 +53,11 @@ def join_bs_tv(congress_num: int, upload: bool=False):
                 continue
 
             # combine info from bill status and text version
+            bs_tv = json.loads(bs_tv.model_dump_json())
             tv = df_tv.iloc[0].to_dict()
-            tv["bs_date"] = bs_tv.date
-            tv["bs_type"] = bs_tv.type
-            tv["url"] = bs_tv.url
+            tv["bs_date"] = bs_tv["date"]
+            tv["bs_type"] = bs_tv["type"]
+            tv["url"] = bs_tv["url"]
 
             xml = tv["xml"]
             xml = xml.strip()
@@ -67,9 +70,9 @@ def join_bs_tv(congress_num: int, upload: bool=False):
         # most recent in front of list and date=None at the end
         tvs = sorted(
             tvs,
-            key=lambda x: x["bs_date"].replace(tzinfo=None)
+            key=lambda x: x["bs_date"]
             if x["bs_date"] is not None
-            else datetime.datetime.min,
+            else datetime.datetime.min.isoformat(),
             reverse=True,
         )
 
