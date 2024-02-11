@@ -5,6 +5,7 @@ from typing import Union
 from datasets import load_dataset
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from huggingface_hub import HfApi
 import rich
 import pandas as pd
 
@@ -118,8 +119,8 @@ def upload_hf(
             exist_ok=True,
         )
         api.upload_file(
-            path_or_fileobj=fout,
-            path_in_repo=fout.name,
+            path_or_fileobj=fpath,
+            path_in_repo=fpath.name,
             repo_id=repo_id,
             repo_type="dataset",
         )
@@ -132,5 +133,5 @@ if __name__ == "__main__":
     chunk_overlap = 256
     congress_nums = [113, 114, 115, 116, 117, 118]
     for congress_num in congress_nums:
-        write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
-#        upload_hf(congress_hf_path, congress_num, chunk_size, chunk_overlap)
+#        write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
+        upload_hf(congress_hf_path, congress_num, chunk_size, chunk_overlap)

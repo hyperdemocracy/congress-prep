@@ -66,8 +66,8 @@ def upload_hf(
             exist_ok=True,
         )
         api.upload_file(
-            path_or_fileobj=fout,
-            path_in_repo=fout.name,
+            path_or_fileobj=fpath,
+            path_in_repo=fpath.name,
             repo_id=repo_id,
             repo_type="dataset",
         )
@@ -77,5 +77,5 @@ if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     for congress_num in range(109, 119):
-        write_local(congress_hf_path, congress_num)
-#        upload_hf(congress_hf_path, congress_num)
+#        write_local(congress_hf_path, congress_num)
+        upload_hf(congress_hf_path, congress_num)

@@ -121,8 +121,8 @@ def upload_hf(congress_hf_path: Union[str, Path], congress_num: int):
             exist_ok=True,
         )
         api.upload_file(
-            path_or_fileobj=fout,
-            path_in_repo=fout.name,
+            path_or_fileobj=fpath,
+            path_in_repo=fpath.name,
             repo_id=repo_id,
             repo_type="dataset",
         )
@@ -133,5 +133,5 @@ if __name__ == "__main__":
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     congress_nums = [113, 114, 115, 116, 117, 118]
     for congress_num in congress_nums:
-        write_local(congress_hf_path, congress_num)
-#        upload_hf(congress_hf_path, congress_num)
+#        write_local(congress_hf_path, congress_num)
+        upload_hf(congress_hf_path, congress_num)

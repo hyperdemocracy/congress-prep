@@ -16,11 +16,12 @@ def write_local(
     chunk_size: int,
     chunk_overlap: int,
     model_name: str,
-    model_tag: str,
     nlim: Optional[int] = None,
 ):
 
     congress_hf_path = Path(congress_hf_path)
+    model_tag = model_name.replace("/", "-")
+
     rich.print(f"{congress_hf_path=}")
     rich.print(f"{congress_num=}")
     rich.print(f"{chunk_size=}")
@@ -66,10 +67,11 @@ def upload_hf(
     chunk_size: int,
     chunk_overlap: int,
     model_name: str,
-    model_tag: str,
 ):
 
     congress_hf_path = Path(congress_hf_path)
+    model_tag = model_name.replace("/", "-")
+
     rich.print(f"{congress_hf_path=}")
     rich.print(f"{congress_num=}")
     rich.print(f"{chunk_size=}")
@@ -90,7 +92,7 @@ def upload_hf(
     )
     api.upload_file(
         path_or_fileobj=fpath,
-        path_in_repo=fout.name,
+        path_in_repo=fpath.name,
         repo_id=repo_id,
         repo_type="dataset",
     )
@@ -101,25 +103,23 @@ if __name__ == "__main__":
     congress_nums = [113, 114, 115, 116, 117, 118]
     chunk_size = 1024
     chunk_overlap = 256
-    model_name = "BAAI/bge-small-en-v1.5"
-    model_tag = "bge-small-en-v1p5"
     nlim = None
+    model_names = ["BAAI/bge-small-en-v1.5", "BAAI/bge-large-en-v1.5"]
+    for model_name in model_names[1:]:
+        for congress_num in congress_nums:
+#            write_local(
+#                congress_hf_path,
+#                congress_num,
+#                chunk_size,
+#                chunk_overlap,
+#                model_name,
+#                nlim=nlim,
+#            )
+            upload_hf(
+                congress_hf_path,
+                congress_num,
+                chunk_size,
+                chunk_overlap,
+                model_name,
+            )
 
-    for congress_num in congress_nums:
-        write_local(
-            congress_hf_path,
-            congress_num,
-            chunk_size,
-            chunk_overlap,
-            model_name,
-            model_tag,
-            nlim=nlim,
-        )
-        #        upload_hf(
-        #            congress_hf_path,
-        #            congress_num,
-        #            chunk_size,
-        #            chunk_overlap,
-        #            model_name,
-        #            model_tag,
-        #        )
