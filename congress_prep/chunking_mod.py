@@ -99,7 +99,7 @@ def write_local(
         [
             {
                 "chunk_id": doc.metadata["chunk_id"],
-                "page_content": doc.page_content,
+                "text": doc.page_content,
                 "metadata": doc.metadata,
             }
             for doc in split_docs
@@ -146,11 +146,11 @@ def upload_hf(
 
     # take metadata from df_u
     df_out = pd.merge(
-        df_c[["chunk_id", "text_id", "legis_id", "page_content"]],
+        df_c[["chunk_id", "text_id", "legis_id", "text"]],
         df_u[["text_id", "metadata"]],
         on="text_id",
     )
-    cols = ["chunk_id", "text_id", "legis_id", "page_content", "metadata"]
+    cols = ["chunk_id", "text_id", "legis_id", "text", "metadata"]
     df_out = df_out[cols]
 
     with tempfile.TemporaryFile() as fp:
