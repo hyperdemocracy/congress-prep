@@ -77,5 +77,5 @@ if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     for congress_num in range(109, 119):
-#        write_local(congress_hf_path, congress_num)
+        #        write_local(congress_hf_path, congress_num)
         upload_hf(congress_hf_path, congress_num)

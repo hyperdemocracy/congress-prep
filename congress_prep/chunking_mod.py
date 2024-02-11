@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Union
+import tempfile
 
 from datasets import load_dataset
 from langchain_core.documents import Document
@@ -8,6 +9,26 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from huggingface_hub import HfApi
 import rich
 import pandas as pd
+
+
+def metadata_from_unified_row(urow: pd.Series):
+    if len(urow["text_versions"]) == 0:
+        return {}
+    else:
+        return {
+            "text_id": urow["text_versions"][0]["text_id"],
+            "legis_version": urow["text_versions"][0]["legis_version"],
+            "legis_class": urow["text_versions"][0]["legis_class"],
+            "legis_id": urow["legis_id"],
+            "congress_num": urow["congress_num"],
+            "legis_type": urow["legis_type"],
+            "legis_num": urow["legis_num"],
+            "origin_chamber": urow["origin_chamber"],
+            "update_date": urow["update_date"],
+            "text_date": urow["text_versions"][0]["bs_date"],
+            "introduced_date": urow["introduced_date"],
+            "sponsor": urow["sponsors"][0]["bioguide_id"],
+        }
 
 
 def write_local(
@@ -51,11 +72,7 @@ def write_local(
                 "congress_num": sample["congress_num"],
                 "legis_type": sample["legis_type"],
                 "legis_num": sample["legis_num"],
-                "origin_chamber": sample["origin_chamber"],
-                "type": sample["type"],
-                "update_date": sample["update_date"],
                 "text_date": sample["text_versions"][0]["bs_date"],
-                "introduced_date": sample["introduced_date"],
             },
         )
         docs.append(doc)
@@ -107,11 +124,40 @@ def upload_hf(
     rich.print(f"{chunk_size=}")
     rich.print(f"{chunk_overlap=}")
 
-    tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
-    fpath = congress_hf_path / f"{tag}.parquet"
-    if fpath.exists():
+    c_tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
+    c_fpath = congress_hf_path / f"{c_tag}.parquet"
+    rich.print(f"{c_fpath=}")
+    if not c_fpath.exists():
+        rich.print(f"{c_fpath} does not exist")
+        return
+    df_c = pd.read_parquet(c_fpath)
+    df_c["text_id"] = df_c["metadata"].apply(lambda x: x["text_id"])
+    df_c["legis_id"] = df_c["metadata"].apply(lambda x: x["legis_id"])
+
+    u_tag = f"usc-{congress_num}-unified-v1"
+    u_fpath = congress_hf_path / f"{u_tag}.parquet"
+    rich.print(f"{u_fpath=}")
+    if not u_fpath.exists():
+        rich.print(f"{u_fpath} does not exist")
+        return
+    df_u = pd.read_parquet(u_fpath)
+    df_u = df_u.rename(columns={"latest_text_id": "text_id"})
+    df_u["metadata"] = df_u.apply(metadata_from_unified_row, axis=1)
+
+    # take metadata from df_u
+    df_out = pd.merge(
+        df_c[["chunk_id", "text_id", "legis_id", "page_content"]],
+        df_u[["text_id", "metadata"]],
+        on="text_id",
+    )
+    cols = ["chunk_id", "text_id", "legis_id", "page_content", "metadata"]
+    df_out = df_out[cols]
+
+    with tempfile.TemporaryFile() as fp:
+        df_out.to_parquet(fp)
+
         api = HfApi()
-        repo_id = f"hyperdemocracy/{tag}"
+        repo_id = f"hyperdemocracy/{c_tag}"
         rich.print(f"{repo_id=}")
         api.create_repo(
             repo_id=repo_id,
@@ -119,8 +165,8 @@ def upload_hf(
             exist_ok=True,
         )
         api.upload_file(
-            path_or_fileobj=fpath,
-            path_in_repo=fpath.name,
+            path_or_fileobj=fp,
+            path_in_repo=c_fpath.name,
             repo_id=repo_id,
             repo_type="dataset",
         )
@@ -133,5 +179,5 @@ if __name__ == "__main__":
     chunk_overlap = 256
     congress_nums = [113, 114, 115, 116, 117, 118]
     for congress_num in congress_nums:
-#        write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
+        write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
         upload_hf(congress_hf_path, congress_num, chunk_size, chunk_overlap)

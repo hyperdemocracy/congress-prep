@@ -107,14 +107,14 @@ if __name__ == "__main__":
     model_names = ["BAAI/bge-small-en-v1.5", "BAAI/bge-large-en-v1.5"]
     for model_name in model_names[1:]:
         for congress_num in congress_nums:
-#            write_local(
-#                congress_hf_path,
-#                congress_num,
-#                chunk_size,
-#                chunk_overlap,
-#                model_name,
-#                nlim=nlim,
-#            )
+            #            write_local(
+            #                congress_hf_path,
+            #                congress_num,
+            #                chunk_size,
+            #                chunk_overlap,
+            #                model_name,
+            #                nlim=nlim,
+            #            )
             upload_hf(
                 congress_hf_path,
                 congress_num,
@@ -122,4 +122,3 @@ if __name__ == "__main__":
                 chunk_overlap,
                 model_name,
             )
-

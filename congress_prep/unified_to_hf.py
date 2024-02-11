@@ -133,5 +133,5 @@ if __name__ == "__main__":
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     congress_nums = [113, 114, 115, 116, 117, 118]
     for congress_num in congress_nums:
-#        write_local(congress_hf_path, congress_num)
+        #        write_local(congress_hf_path, congress_num)
         upload_hf(congress_hf_path, congress_num)
