@@ -143,7 +143,7 @@ if __name__ == "__main__":
     chunk_overlap = 256
     nlim = None
     model_names = ["BAAI/bge-small-en-v1.5", "BAAI/bge-large-en-v1.5"]
-    for model_name in model_names[0:1]:
+    for model_name in model_names[1:]:
         for congress_num in congress_nums:
             #            write_local(
             #                congress_hf_path,
