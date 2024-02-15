@@ -74,6 +74,7 @@ def write_local(
     df_u = pd.read_parquet(u_fpath)
 
     text_splitter = RecursiveCharacterTextSplitter(
+        separators = ["\n\n", ";", "\n", " ", ""],
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         length_function=len,
@@ -173,9 +174,10 @@ def upload_hf(
 if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
-    chunk_size = 1024
-    chunk_overlap = 256
+    chunk_size = 8192
+    chunk_overlap = 512
     congress_nums = [113, 114, 115, 116, 117, 118]
+#    congress_nums = [113]
     for congress_num in congress_nums:
         write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
         upload_hf(congress_hf_path, congress_num, chunk_size, chunk_overlap)
