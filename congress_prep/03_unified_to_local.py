@@ -103,35 +103,10 @@ def write_local(congress_hf_path: Union[str, Path], congress_num: int):
     dfu.to_parquet(fout)
 
 
-def upload_hf(congress_hf_path: Union[str, Path], congress_num: int):
-
-    congress_hf_path = Path(congress_hf_path)
-    rich.print(f"{congress_hf_path=}")
-    rich.print(f"{congress_num=}")
-
-    tag = f"usc-{congress_num}-unified-v1"
-    fpath = congress_hf_path / f"{tag}.parquet"
-    if fpath.exists():
-        api = HfApi()
-        repo_id = f"hyperdemocracy/{tag}"
-        rich.print(f"{repo_id=}")
-        api.create_repo(
-            repo_id=repo_id,
-            repo_type="dataset",
-            exist_ok=True,
-        )
-        api.upload_file(
-            path_or_fileobj=fpath,
-            path_in_repo=fpath.name,
-            repo_id=repo_id,
-            repo_type="dataset",
-        )
-
-
 if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     congress_nums = [113, 114, 115, 116, 117, 118]
     for congress_num in congress_nums:
-        #        write_local(congress_hf_path, congress_num)
-        upload_hf(congress_hf_path, congress_num)
+        write_local(congress_hf_path, congress_num)
+

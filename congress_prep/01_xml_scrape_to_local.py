@@ -1,5 +1,5 @@
 """
-Upload scrapes from https://github.com/unitedstates/congress to HF
+Write scrapes from https://github.com/unitedstates/congress to local parquet
 """
 
 from collections import Counter
@@ -154,64 +154,6 @@ def write_local(congress_scraper_path: Union[str, Path]):
                 df_out.to_parquet(fpath)
 
 
-def upload_hf(congress_scraper_path: Union[str, Path], congress_nums: list[int]):
-    """Upload scraped xml files to huggingface
-
-    Creates or updates two huggingface datasets per congress num.
-    One for billstatus metadata and one for textversions.
-    Note that this does not upload uslm_xml just the ddt_xml.
-
-    congress_scraper_path: scraper output directory. should contain "data" and "cache" as sub-directories
-    congress_nums: list of congress numbers e.g. [113, 114, 115]
-    """
-
-    congress_scraper_path = Path(congress_scraper_path)
-    congress_hf_path = congress_scraper_path.parent / "congress-hf"
-    api = HfApi()
-    for cn in congress_nums:
-
-        rich.print(f"congress_num={cn}")
-
-        # upload billstatus dataset
-        # --------------------------------
-        tag = f"usc-{cn}-billstatus-xml"
-        fpath = congress_hf_path / f"{tag}.parquet"
-        repo_id = f"hyperdemocracy/{tag}"
-        if fpath.exists():
-            rich.print(f"{repo_id=}")
-            api.create_repo(
-                repo_id=repo_id,
-                repo_type="dataset",
-                exist_ok=True,
-            )
-            api.upload_file(
-                path_or_fileobj=fpath,
-                path_in_repo=fpath.name,
-                repo_id=repo_id,
-                repo_type="dataset",
-            )
-
-        # upload textversions datasets
-        # --------------------------------
-        for xml_type in ["ddt_xml", "uslm_xml"]:
-            tag = "usc-{}-textversions-{}".format(cn, xml_type.replace("_", "-"))
-            fpath = congress_hf_path / f"{tag}.parquet"
-            repo_id = f"hyperdemocracy/{tag}"
-            if fpath.exists():
-                rich.print(f"{repo_id=}")
-                api.create_repo(
-                    repo_id=repo_id,
-                    repo_type="dataset",
-                    exist_ok=True,
-                )
-                api.upload_file(
-                    path_or_fileobj=fpath,
-                    path_in_repo=fpath.name,
-                    repo_id=repo_id,
-                    repo_type="dataset",
-                )
-
-
 if __name__ == "__main__":
 
     congress_scraper_path = Path("/Users/galtay/data/congress-scraper")
@@ -222,6 +164,3 @@ if __name__ == "__main__":
 # to write local parquet files
 #    write_local(congress_scraper_path)
 
-# to upload to HF
-#    congress_nums = list(range(109, 119))
-#    upload_hf(congress_scraper_path, congress_nums)

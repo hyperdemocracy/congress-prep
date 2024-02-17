@@ -174,7 +174,7 @@ def upload_hf(
 if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
-    chunk_size = 8192
+    chunk_size = 4096
     chunk_overlap = 512
     congress_nums = [113, 114, 115, 116, 117, 118]
 #    congress_nums = [113]
