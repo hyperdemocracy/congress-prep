@@ -1,11 +1,13 @@
 """
-Upload scrapes to HF
+Upload local data to HF
 """
 
 from pathlib import Path
 from typing import Optional, Union
 
 from huggingface_hub import HfApi
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pandas as pd
 import rich
 
@@ -36,6 +38,7 @@ def upload_hf(congress_hf_path: Union[str, Path], congress_nums: list[int], file
         repo_id=repo_id,
         repo_type="dataset",
     )
+
 
     for cn in congress_nums:
 
@@ -91,8 +94,7 @@ def upload_hf(congress_hf_path: Union[str, Path], congress_nums: list[int], file
         # --------------------------------
         file_type = "unified_v1"
         if file_type in file_types:
-            tag = f"usc-{cn}-unified-v1"
-            fpath = congress_hf_path / f"{tag}.parquet"
+            fpath = congress_hf_path / f"usc-{cn}-unified-v1.parquet"
             if fpath.exists():
                 rich.print(f"{fpath=}")
                 api.upload_file(
@@ -101,6 +103,27 @@ def upload_hf(congress_hf_path: Union[str, Path], congress_nums: list[int], file
                     repo_id=repo_id,
                     repo_type="dataset",
                 )
+
+        # upload chunking files
+        # --------------------------------
+        fts = [
+            "chunks_v1_s1024_o256",
+            "chunks_v1_s2048_o256",
+            "chunks_v1_s4096_o512",
+            "chunks_v1_s8192_o512",
+        ]
+        for file_type in fts:
+            if file_type in file_types:
+                tag = f"usc-{cn}-{file_type.replace('_', '-')}"
+                fpath = congress_hf_path / f"{tag}.parquet"
+                if fpath.exists():
+                    rich.print(f"{fpath=}")
+                    api.upload_file(
+                        path_or_fileobj=fpath,
+                        path_in_repo=str(Path("data") / file_type / fpath.name),
+                        repo_id=repo_id,
+                        repo_type="dataset",
+                    )
 
 
 
@@ -112,7 +135,12 @@ if __name__ == "__main__":
 #        "textversions_ddt_xml",
 #        "textversions_uslm_xml",
 #        "billstatus_parsed",
-        "unified_v1",
+#        "unified_v1",
+#        "chunks_v1_s1024_o256",
+#        "chunks_v1_s2048_o256",
+#        "chunks_v1_s4096_o512",
+#        "chunks_v1_s8192_o512",
     ]
+#    congress_nums = list(range(108, 119))
     congress_nums = list(range(113, 119))
     upload_hf(congress_hf_path, congress_nums, file_types)

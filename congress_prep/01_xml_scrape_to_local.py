@@ -157,10 +157,5 @@ def write_local(congress_scraper_path: Union[str, Path]):
 if __name__ == "__main__":
 
     congress_scraper_path = Path("/Users/galtay/data/congress-scraper")
-
-    # to just read the dataframe
-#    df = dataframe_from_scrape_files(congress_scraper_path)
-
-# to write local parquet files
-#    write_local(congress_scraper_path)
+    write_local(congress_scraper_path)
 

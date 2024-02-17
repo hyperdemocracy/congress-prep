@@ -6,11 +6,13 @@ con = duckdb.connect()
 con.execute("INSTALL httpfs;")
 con.execute("LOAD httpfs;")
 
-ds_name = "hyperdemocracy/usc-118-unified-v1"
+ds_name = "hyperdemocracy/us-congress"
 
 response = requests.get(f"https://datasets-server.huggingface.co/parquet?dataset={ds_name}")
-urls = [f['url'] for f in response.json()['parquet_files'] if f['split'] == 'train']
+urls = [f['url'] for f in response.json()['parquet_files'] if f['config'] == 'unified_v1']
 print(urls)
+
+sys.exit(0)
 
 # you can read the parquet files remotely into a dataframe if you want
 df = pd.concat([pd.read_parquet(url) for url in urls]).reset_index(drop=True)
