@@ -19,13 +19,20 @@ from bill_status_mod import BillStatus
 from textversions_mod import get_bill_text_v1
 
 
-
 def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
 
-    df_bs = pd.read_parquet(congress_hf_path / f"usc-{cn}-billstatus-parsed.parquet")
+    df_bs = pd.read_parquet(
+        congress_hf_path
+        / "usc-billstatus-parsed"
+        / f"usc-{cn}-billstatus-parsed.parquet"
+    )
     assert df_bs["legis_id"].nunique() == df_bs.shape[0]
 
-    df_tv_xml = pd.read_parquet(congress_hf_path / f"usc-{cn}-textversions-ddt-xml.parquet")
+    df_tv_xml = pd.read_parquet(
+        congress_hf_path
+        / "usc-textversions-dtd-xml"
+        / f"usc-{cn}-textversions-dtd-xml.parquet"
+    )
     assert df_tv_xml["text_id"].nunique() == df_tv_xml.shape[0]
 
     df_tvs = []
@@ -71,7 +78,6 @@ def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
             tv.pop("xml")
             tvs.append(tv)
 
-
         # sort all text versions for a bill by date.
         # most recent in front of list and date=None at the end
         tvs = sorted(
@@ -84,11 +90,13 @@ def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
             reverse=True,
         )
 
-        df_tvs.append({
-            "legis_id": bs_row["legis_id"],
-            "textversions": tvs,
-            "latest_text_id": tvs[0]["text_id"] if len(tvs) > 0 else None,
-        })
+        df_tvs.append(
+            {
+                "legis_id": bs_row["legis_id"],
+                "textversions": tvs,
+                "latest_text_id": tvs[0]["text_id"] if len(tvs) > 0 else None,
+            }
+        )
 
     df_tvs = pd.DataFrame(df_tvs)
     df_out = pd.merge(df_bs, df_tvs, on="legis_id", how="left")
@@ -107,23 +115,22 @@ def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
     return df_out
 
 
-
-
 def write_local(congress_hf_path: Union[str, Path], congress_nums: list[int]):
 
     congress_hf_path = Path(congress_hf_path)
     rich.print(f"{congress_hf_path=}")
     rich.print(f"{congress_nums=}")
 
-    df_out = pd.concat([
-        merge_bs_tv(congress_hf_path, cn)
-        for cn in congress_nums
-    ]).reset_index(drop=True)
+    df_out = pd.concat(
+        [merge_bs_tv(congress_hf_path, cn) for cn in congress_nums]
+    ).reset_index(drop=True)
 
     table = pa.Table.from_pandas(df_out)
+    out_path = congress_hf_path / "usc-unified-v1"
+    out_path.mkdir(parents=True, exist_ok=True)
     for cn in df_out["congress_num"].unique():
-        tf = table.filter((df_out['congress_num']==cn).values)
-        fpath = congress_hf_path / f"usc-{cn}-unified-v1.parquet"
+        tf = table.filter((df_out["congress_num"] == cn).values)
+        fpath = out_path / f"usc-{cn}-unified-v1.parquet"
         rich.print(f"{fpath=}")
         pq.write_table(tf, fpath)
 
@@ -133,4 +140,3 @@ if __name__ == "__main__":
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     congress_nums = [113, 114, 115, 116, 117, 118]
     write_local(congress_hf_path, congress_nums)
-

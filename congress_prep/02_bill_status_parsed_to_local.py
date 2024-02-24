@@ -25,14 +25,17 @@ def write_local(
     rich.print(f"{congress_hf_path=}")
     rich.print(f"{congress_nums=}")
 
+    in_path = congress_hf_path / "usc-billstatus-xml"
     xml_file_paths = [
-        congress_hf_path / f"usc-{cn}-billstatus-xml.parquet"
-        for cn in congress_nums
+        in_path / f"usc-{cn}-billstatus-xml.parquet" for cn in congress_nums
     ]
-    df = pd.concat([
-        pd.read_parquet(xml_file_path) for xml_file_path in xml_file_paths
-        if xml_file_path.exists()
-    ]).reset_index(drop=True)
+    df = pd.concat(
+        [
+            pd.read_parquet(xml_file_path)
+            for xml_file_path in xml_file_paths
+            if xml_file_path.exists()
+        ]
+    ).reset_index(drop=True)
 
     bss = []
     for _, row in df.iterrows():
@@ -45,9 +48,11 @@ def write_local(
     df = df.drop(columns=["xml"])
 
     table = pa.Table.from_pandas(df)
+    out_path = congress_hf_path / "usc-billstatus-parsed"
+    out_path.mkdir(parents=True, exist_ok=True)
     for cn in df["congress_num"].unique():
-        tf = table.filter((df['congress_num']==cn).values)
-        fpath = congress_hf_path / f"usc-{cn}-billstatus-parsed.parquet"
+        tf = table.filter((df["congress_num"] == cn).values)
+        fpath = out_path / f"usc-{cn}-billstatus-parsed.parquet"
         rich.print(f"{fpath=}")
         pq.write_table(tf, fpath)
 

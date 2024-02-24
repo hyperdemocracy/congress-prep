@@ -69,12 +69,14 @@ def write_local(
     rich.print(f"{chunk_size=}")
     rich.print(f"{chunk_overlap=}")
 
-    u_fpath = congress_hf_path / f"usc-{congress_num}-unified-v1.parquet"
+    u_fpath = (
+        congress_hf_path / "usc-unified-v1" / f"usc-{congress_num}-unified-v1.parquet"
+    )
     rich.print(u_fpath)
     df_u = pd.read_parquet(u_fpath)
 
     text_splitter = RecursiveCharacterTextSplitter(
-        separators = ["\n\n", ";", "\n", " ", ""],
+        separators=["\n\n", ";", "\n", " ", ""],
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         length_function=len,
@@ -100,10 +102,14 @@ def write_local(
     df_c["text_id"] = df_c["metadata"].apply(lambda x: x["text_id"])
     df_c["legis_id"] = df_c["metadata"].apply(lambda x: x["legis_id"])
 
-    tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
+    chunk_tag = f"chunks-v1-s{chunk_size}-o{chunk_overlap}"
+    file_tag = f"usc-{congress_num}-{chunk_tag}"
+
     cols = ["chunk_id", "text_id", "legis_id", "text", "metadata"]
     df_c = df_c[cols]
-    fout = congress_hf_path / f"{tag}.parquet"
+    out_path = congress_hf_path / f"usc-{chunk_tag}"
+    out_path.mkdir(parents=True, exist_ok=True)
+    fout = out_path / f"{file_tag}.parquet"
     rich.print(f"{fout=}")
     df_c.to_parquet(fout)
 
@@ -111,21 +117,8 @@ def write_local(
 if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
-
-#    chunk_size = 8192
-#    chunk_overlap = 512
-
-#    chunk_size = 4096
-#    chunk_overlap = 512
-
-#    chunk_size = 2048
-#    chunk_overlap = 256
-
-    chunk_size = 1024
-    chunk_overlap = 256
-
-
-    congress_nums = [113, 114, 115, 116, 117, 118]
-    for congress_num in congress_nums:
-        write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)
-
+    chunks = [(8192, 512), (4096, 512), (2048, 256), (1024, 256)]
+    for chunk_size, chunk_overlap in chunks:
+        congress_nums = [113, 114, 115, 116, 117, 118]
+        for congress_num in congress_nums:
+            write_local(congress_hf_path, congress_num, chunk_size, chunk_overlap)

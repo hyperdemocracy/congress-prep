@@ -50,7 +50,7 @@ def dataframe_from_scrape_files(
             if "/uslm/" in path_str:
                 file_type = "uslm_xml"
             else:
-                file_type = "ddt_xml"
+                file_type = "dtd_xml"
 
             match = re.match(BILLS_PATTERN, path_object.name)
             if match:
@@ -114,7 +114,9 @@ def write_local(congress_scraper_path: Union[str, Path]):
                 "path",
                 "xml",
             ]
-            fpath = congress_hf_path / f"usc-{cn}-billstatus-xml.parquet"
+            out_path = congress_hf_path / "usc-billstatus-xml"
+            out_path.mkdir(parents=True, exist_ok=True)
+            fpath = out_path / f"usc-{cn}-billstatus-xml.parquet"
             df_out = df_out.sort_values(["legis_type", "legis_num"]).reset_index(
                 drop=True
             )
@@ -124,7 +126,7 @@ def write_local(congress_scraper_path: Union[str, Path]):
 
         # write xml textversions dataset
         # --------------------------------
-        for xml_type in ["ddt_xml", "uslm_xml"]:
+        for xml_type in ["dtd_xml", "uslm_xml"]:
             df_out = df_cn[df_cn["file_type"] == xml_type].copy()
             if df_out.shape[0] > 0:
                 cols = [
@@ -143,7 +145,11 @@ def write_local(congress_scraper_path: Union[str, Path]):
                     lambda x: x["legis_id"] + "-" + str(x["legis_version"]), axis=1
                 )
                 assert df_out["text_id"].nunique() == df_out.shape[0]
-                fpath = congress_hf_path / "usc-{}-textversions-{}.parquet".format(
+                out_path = congress_hf_path / "usc-textversions-{}".format(
+                    xml_type.replace("_", "-")
+                )
+                out_path.mkdir(parents=True, exist_ok=True)
+                fpath = out_path / "usc-{}-textversions-{}.parquet".format(
                     cn, xml_type.replace("_", "-")
                 )
                 df_out = df_out.sort_values(
@@ -158,4 +164,3 @@ if __name__ == "__main__":
 
     congress_scraper_path = Path("/Users/galtay/data/congress-scraper")
     write_local(congress_scraper_path)
-
