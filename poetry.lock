@@ -3024,6 +3024,29 @@ typing = ["typing-extensions"]
 xmp = ["defusedxml"]
 
 [[package]]
+name = "pinecone-client"
+version = "3.1.0"
+description = "Pinecone client and SDK"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "pinecone_client-3.1.0-py3-none-any.whl", hash = "sha256:66dfe9859ed5b3412c3b59c68c9706c0f522cafd1a15c5d05e28d5664c2c48a4"},
+    {file = "pinecone_client-3.1.0.tar.gz", hash = "sha256:45b8206013f91a982b994f1fbaa39e7e8c99d30ef3778a9f319c43b8c992fc42"},
+]
+
+[package.dependencies]
+certifi = ">=2019.11.17"
+tqdm = ">=4.64.1"
+typing-extensions = ">=3.7.4"
+urllib3 = [
+    {version = ">=1.26.0", markers = "python_version >= \"3.8\" and python_version < \"3.12\""},
+    {version = ">=1.26.5", markers = "python_version >= \"3.12\" and python_version < \"4.0\""},
+]
+
+[package.extras]
+grpc = ["googleapis-common-protos (>=1.53.0)", "grpc-gateway-protoc-gen-openapiv2 (==0.1.0)", "grpcio (>=1.44.0)", "grpcio (>=1.59.0)", "lz4 (>=3.1.3)", "protobuf (>=3.20.0,<3.21.0)"]
+
+[[package]]
 name = "posthog"
 version = "3.4.0"
 description = "Integrate PostHog into any python application."
@@ -5657,4 +5680,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "f382116cbe816726bc44e1a7e60865b2b4d904e7e3e2f65ebc17f103cf778489"
+content-hash = "a8a651030cf3a3f862176a7bd658db4a7ba007ba62b9db873884eb1a1371fe81"

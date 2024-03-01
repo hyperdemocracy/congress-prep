@@ -1,8 +1,10 @@
 import json
+import os
 from pathlib import Path
 from typing import Optional, Union
 import shutil
 
+from pinecone import Pinecone, ServerlessSpec
 import chromadb
 from chromadb.utils import embedding_functions
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
@@ -14,7 +16,7 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 
 
-def create_index(
+def upsert_data(
     congress_hf_path: Union[str, Path],
     congress_nums: list[int],
     chunk_size: int,
@@ -36,26 +38,10 @@ def create_index(
     rich.print(f"{model_tag=}")
     rich.print(f"{cn_tag=}")
 
-    model_kwargs = {"device": "cpu"}
-    encode_kwargs = {"normalize_embeddings": True}
-    emb_fn = HuggingFaceBgeEmbeddings(
-        model_name=model_name,
-        model_kwargs=model_kwargs,
-        encode_kwargs=encode_kwargs,
-        query_instruction="Represent this question for searching relevant passages: ",
-    )
-
-    # tag for all congress nums
-    persistent_tag = f"usc-{cn_tag}-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
-    persistent_path = congress_hf_path / f"{persistent_tag}-chromadb"
-    rich.print(f"{persistent_path=}")
-    if persistent_path.exists():
-        shutil.rmtree(persistent_path)
-
-    chroma_client = chromadb.PersistentClient(path=str(persistent_path))
-    collection = chroma_client.create_collection(
-        name=persistent_tag, get_or_create=True
-    )
+    pinecone_api_key = os.getenv("PINECONE_API_KEY")
+    pc = Pinecone(api_key=pinecone_api_key)
+    index_name = get_index_name(model_name, congress_nums, chunk_size, chunk_overlap)
+    index = pc.Index(index_name)
 
     for cn in congress_nums:
 
@@ -79,26 +65,16 @@ def create_index(
 
         df["metadata"] = df.apply(
             lambda x: {
+                "text": x["text"],
                 "sponsor_bioguide_id": x["bill_metadata"]["sponsors"][0]["bioguide_id"],
                 "sponsor_full_name": x["bill_metadata"]["sponsors"][0]["full_name"],
                 "sponsor_party": x["bill_metadata"]["sponsors"][0]["party"],
                 "sponsor_state": x["bill_metadata"]["sponsors"][0]["state"],
-                "cosponsor_bioguide_ids": "|".join(
-                    [el["bioguide_id"] for el in x["bill_metadata"]["cosponsors"]]
-                ),
-                "cosponsor_full_names": "|".join(
-                    [el["full_name"] for el in x["bill_metadata"]["cosponsors"]]
-                ),
-                "cosponsor_parties": "|".join(
-                    [el["party"] for el in x["bill_metadata"]["cosponsors"]]
-                ),
-                "cosponsor_states": "|".join(
-                    [el["state"] for el in x["bill_metadata"]["cosponsors"]]
-                ),
+                "cosponsor_bioguide_ids": [el["bioguide_id"] for el in x["bill_metadata"]["cosponsors"]],
                 "introduced_date": x["bill_metadata"]["introduced_date"],
                 "policy_area": x["bill_metadata"]["policy_area"],
                 "title": x["bill_metadata"]["title"],
-                "subjects": "|".join(x["bill_metadata"]["subjects"]),
+                "subjects": x["bill_metadata"]["subjects"].tolist(),
                 **x["chunk_metadata"],
             },
             axis=1,
@@ -107,23 +83,18 @@ def create_index(
         assert df["chunk_id"].nunique() == df.shape[0]
         ii_los = list(range(0, df.shape[0], batch_size))
         for ii_lo in tqdm(ii_los):
-
             df_batch = df.iloc[ii_lo : ii_lo + batch_size]
-            vecs = np.stack(df_batch["vec"].values)
-            vecs = normalize(vecs)
+            vectors = []
+            for _, row in df_batch.iterrows():
+                meta = {k: v for k, v in row["metadata"].items() if v is not None}
+                vector = {
+                    "id": row["chunk_id"],
+                    "values": row["vec"].tolist(),
+                    "metadata": meta,
+                }
+                vectors.append(vector)
+            index.upsert(vectors=vectors)
 
-            metas = df_batch["metadata"].tolist()
-            metas = [
-                {k: str(v) if v is None else v for k, v in meta.items()}
-                for meta in metas
-            ]
-
-            collection.add(
-                embeddings=vecs.tolist(),
-                documents=df_batch["text"].tolist(),
-                metadatas=metas,
-                ids=df_batch["chunk_id"].to_list(),
-            )
 
 
 def load_collection(
@@ -183,38 +154,57 @@ def load_langchain_db(
     return langchain_db
 
 
+
+def get_index_name(model_name: str, cns: list[int], chunk_size: int, chunk_overlap: int):
+    model_tag = model_name.split("/")[-1].replace(".","p")
+    cn_tag = f"{cns[0]}to{cns[-1]}"
+    index_name = f"usc-{cn_tag}-s{chunk_size}-o{chunk_overlap}-{model_tag}"
+    return index_name
+
+
+def create_index(model_name: str, cns: list[int], chunk_size: int, chunk_overlap: int, dimension: int):
+    pinecone_api_key = os.getenv("PINECONE_API_KEY")
+    pc = Pinecone(api_key=pinecone_api_key)
+    index_name = get_index_name(model_name, cns, chunk_size, chunk_overlap)
+    print(index_name)
+    pc.create_index(
+        name=index_name,
+        dimension=dimension,
+        metric="cosine",
+        spec=ServerlessSpec(
+            cloud="aws",
+            region="us-west-2"
+        )
+    )
+    return index_name
+
+
+
 if __name__ == "__main__":
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
     cns = [113, 114, 115, 116, 117, 118]
     chunk_size = 1024
     chunk_overlap = 256
-#    model_name = "BAAI/bge-small-en-v1.5"
-    model_name = "BAAI/bge-large-en-v1.5"
-    batch_size = 5000
+    batch_size = 50
     nlim = None
 
-    # create one chroma index with all congress nums
-    create_index(
+    model_name = "BAAI/bge-small-en-v1.5"
+    dimension=384
+
+#    model_name = "BAAI/bge-large-en-v1.5"
+#    dimension=1024
+
+
+    #create_index(model_name, cns, chunk_size, chunk_overlap, dimension)
+    upsert_data(
         congress_hf_path,
         cns,
         chunk_size,
         chunk_overlap,
         model_name,
-        batch_size=batch_size,
+        batch_size,
         nlim=nlim,
     )
 
-    sys.exit(0)
 
-    # and create one for each congress num
-    for cn in cns:
 
-        create_index(
-            congress_hf_path,
-            [cn],
-            chunk_size,
-            chunk_overlap,
-            model_name,
-            batch_size=batch_size,
-            nlim=nlim,
-        )

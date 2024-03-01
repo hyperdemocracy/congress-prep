@@ -6,11 +6,64 @@ from typing import Optional, Union
 from datasets import load_dataset
 from langchain_core.documents import Document
 from huggingface_hub import HfApi
+import numpy as np
 import pandas as pd
 import rich
 from sentence_transformers import SentenceTransformer
+import yaml
 
 from congress_prep import utils
+
+
+VEC_DTYPE = "float32"
+
+
+def get_readme_str(
+    model_name: str, chunk_size: int, chunk_overlap: int, congress_nums: list[int]
+):
+
+    model_tag = model_name.replace("/", "-")
+    yaml_dict = {
+        "configs": [
+            {
+                "config_name": "default",
+                "data_files": [
+                    {
+                        "split": str(cn),
+                        "path": f"data/usc-{cn}-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}.parquet",
+                    }
+                    for cn in congress_nums
+                ],
+            }
+        ],
+        "dataset_info": {
+            "features": [
+                {"name": "chunk_id", "dtype": "string"},
+                {"name": "text_id", "dtype": "string"},
+                {"name": "legis_id", "dtype": "string"},
+                {"name": "text", "dtype": "string"},
+                {"name": "vec", "list": {"dtype": VEC_DTYPE}},
+                {
+                    "name": "metadata",
+                    "struct": [
+                        {"name": "chunk_id", "dtype": "string"},
+                        {"name": "chunk_index", "dtype": "int32"},
+                        {"name": "congress_num", "dtype": "int32"},
+                        {"name": "legis_class", "dtype": "string"},
+                        {"name": "legis_id", "dtype": "string"},
+                        {"name": "legis_num", "dtype": "int32"},
+                        {"name": "legis_type", "dtype": "string"},
+                        {"name": "legis_version", "dtype": "string"},
+                        {"name": "start_index", "dtype": "int32"},
+                        {"name": "text_date", "dtype": "string"},
+                        {"name": "text_id", "dtype": "string"},
+                    ],
+                },
+            ]
+        },
+    }
+    readme_str = "---\n{}---".format(yaml.safe_dump(yaml_dict))
+    return readme_str
 
 
 def write_local(
@@ -33,9 +86,11 @@ def write_local(
     rich.print(f"{model_name=}")
     rich.print(f"{model_tag=}")
 
-    c_tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
-    c_fpath = congress_hf_path / f"{c_tag}.parquet"
+    chunk_tag = f"chunks-v1-s{chunk_size}-o{chunk_overlap}"
+    c_tag = f"usc-{congress_num}-{chunk_tag}"
+    c_fpath = congress_hf_path / f"usc-{chunk_tag}" / f"{c_tag}.parquet"
     df_c = pd.read_parquet(c_fpath)
+
     if nlim is not None:
         df_c = df_c.head(nlim)
 
@@ -44,30 +99,25 @@ def write_local(
         df_c["text"].tolist(),
         show_progress_bar=True,
     )
-    df_text = pd.DataFrame({"text": df_c["text"].tolist()})
-    df_vec = pd.DataFrame({"vec": vecs.tolist()})
-    df_v = pd.concat(
-        [
-            df_text,
-            df_c[["metadata"]],
-            df_vec,
-        ],
-        axis=1,
-    )
-    df_v["chunk_id"] = df_v["metadata"].apply(lambda x: x["chunk_id"])
-    df_v["text_id"] = df_v["metadata"].apply(lambda x: x["text_id"])
-    df_v["legis_id"] = df_v["metadata"].apply(lambda x: x["legis_id"])
+
+    df_c["vec"] = [row for row in vecs]
+    df_c["chunk_id"] = df_c["metadata"].apply(lambda x: x["chunk_id"])
+    df_c["text_id"] = df_c["metadata"].apply(lambda x: x["text_id"])
+    df_c["legis_id"] = df_c["metadata"].apply(lambda x: x["legis_id"])
     col_order = ["chunk_id", "text_id", "legis_id", "text", "metadata", "vec"]
-    df_v = df_v[col_order]
+    df_c = df_c[col_order]
+
+    out_dir = f"usc-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
+    out_path = congress_hf_path / out_dir / "data"
+    out_path.mkdir(parents=True, exist_ok=True)
 
     v_tag = f"usc-{congress_num}-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
-    v_fpath = congress_hf_path / f"{v_tag}.parquet"
-    df_v.to_parquet(v_fpath)
+    v_fpath = out_path / f"{v_tag}.parquet"
+    df_c.to_parquet(v_fpath)
 
 
 def upload_hf(
     congress_hf_path: Union[str, Path],
-    congress_num: int,
     chunk_size: int,
     chunk_overlap: int,
     model_name: str,
@@ -78,61 +128,47 @@ def upload_hf(
 
     rich.print("EMBEDDING (upload hf)")
     rich.print(f"{congress_hf_path=}")
-    rich.print(f"{congress_num=}")
     rich.print(f"{chunk_size=}")
     rich.print(f"{chunk_overlap=}")
     rich.print(f"{model_name=}")
     rich.print(f"{model_tag=}")
 
-    v_tag = f"usc-{congress_num}-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
-    v_fpath = congress_hf_path / f"{v_tag}.parquet"
-    rich.print(f"{v_fpath=}")
-    if not v_fpath.exists():
-        rich.print(f"{v_fpath} does not exist")
-        return
-    df_v = pd.read_parquet(v_fpath)
-    df_v["metadata"] = df_v["metadata"].apply(
-        lambda x: {k: v for k, v in x.items() if k != "type"}
-    )
-
-    c_tag = f"usc-{congress_num}-chunks-v1-s{chunk_size}-o{chunk_overlap}"
-    c_fpath = congress_hf_path / f"{c_tag}.parquet"
-    rich.print(f"{c_fpath=}")
-    if not c_fpath.exists():
-        rich.print(f"{c_fpath} does not exist")
-        return
-    df_c = pd.read_parquet(c_fpath)
-
-    # merge metadata from chunking and embedding
-    df_out = pd.merge(
-        df_v,
-        df_c[["chunk_id", "metadata"]],
-        on="chunk_id",
-    )
-    df_out["metadata"] = df_out.apply(
-        lambda z: {**z["metadata_x"], **z["metadata_y"]}, axis=1
-    )
-    df_out = df_out.drop(columns=["metadata_x", "metadata_y"])
-    cols = ["chunk_id", "text_id", "legis_id", "text", "metadata", "vec"]
-    df_out = df_out[cols]
-
-    # overwrite original
-    df_out.to_parquet(v_fpath)
+    tag = f"usc-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
+    upload_folder = congress_hf_path / tag
+    repo_id = f"hyperdemocracy/{tag}"
+    rich.print(f"{repo_id=}")
+    rich.print(f"{upload_folder=}")
 
     api = HfApi()
-    repo_id = f"hyperdemocracy/{v_tag}"
-    rich.print(f"{repo_id=}")
     api.create_repo(
         repo_id=repo_id,
         repo_type="dataset",
         exist_ok=True,
     )
-    api.upload_file(
-        path_or_fileobj=v_fpath,
-        path_in_repo=v_fpath.name,
+    api.upload_folder(
+        folder_path=upload_folder,
+#        path_in_repo="",
         repo_id=repo_id,
         repo_type="dataset",
     )
+
+
+def write_readme(
+    congress_hf_path: Union[Path, str],
+    model_name: str,
+    chunk_size: int,
+    chunk_overlap: int,
+    congress_nums: list[int],
+):
+
+    model_tag = model_name.replace("/", "-")
+    out_dir = f"usc-vecs-v1-s{chunk_size}-o{chunk_overlap}-{model_tag}"
+    out_path = Path(congress_hf_path) / out_dir
+    out_path.mkdir(parents=True, exist_ok=True)
+    fpath = Path(out_path) / "README.md"
+    readme_str = get_readme_str(model_name, chunk_size, chunk_overlap, congress_nums)
+    with open(fpath, "w") as fp:
+        fp.write(readme_str)
 
 
 if __name__ == "__main__":
@@ -143,19 +179,26 @@ if __name__ == "__main__":
     chunk_overlap = 256
     nlim = None
     model_names = ["BAAI/bge-small-en-v1.5", "BAAI/bge-large-en-v1.5"]
-    for model_name in model_names[1:]:
-        for congress_num in congress_nums:
-            #            write_local(
-            #                congress_hf_path,
-            #                congress_num,
-            #                chunk_size,
-            #                chunk_overlap,
-            #                model_name,
-            #                nlim=nlim,
-            #            )
+
+    do_write_local = False
+    do_upload_hf = False
+
+    for model_name in model_names:
+        if do_write_local:
+            write_readme(congress_hf_path, model_name, chunk_size, chunk_overlap, congress_nums)
+            for congress_num in congress_nums:
+                write_local(
+                    congress_hf_path,
+                    congress_num,
+                    chunk_size,
+                    chunk_overlap,
+                    model_name,
+                    nlim=nlim,
+                )
+
+        if do_upload_hf:
             upload_hf(
                 congress_hf_path,
-                congress_num,
                 chunk_size,
                 chunk_overlap,
                 model_name,

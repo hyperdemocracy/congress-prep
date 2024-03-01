@@ -11,12 +11,7 @@ from huggingface_hub import HfApi
 import pandas as pd
 import rich
 
-
-BILLS_PATTERN = re.compile(r"BILLS-(\d{3})([a-zA-Z]+)(\d+)(\w+)\.xml")
-PLAW_PATTERN = re.compile(r"PLAW-(\d{3})([a-zA-Z]+)(\d+)\.xml")
-FILE_PATTERN = re.compile(
-    r"data/(\d{3})/(\w+)/(\w+)/([a-zA-Z]+)(\d+)/fdsys_billstatus\.xml"
-)
+from congress_prep import utils
 
 
 def dataframe_from_scrape_files(
@@ -39,12 +34,15 @@ def dataframe_from_scrape_files(
         if path_object.name == "fdsys_billstatus.xml":
             file_type = "billstatus"
             legis_version = None
-            match = re.match(FILE_PATTERN, path_str)
+            match = re.match(utils.FILE_PATTERN, path_str)
             if match:
                 congress_num, legis_class, legis_type, _, legis_num = match.groups()
             else:
                 print("billstatus oops: {}".format(path_object))
                 continue
+
+            lastmod_path = path_object.parent / "fdsys_billstatus-lastmod.txt"
+            lastmod_str = lastmod_path.read_text()
 
         else:
             if "/uslm/" in path_str:
@@ -52,12 +50,14 @@ def dataframe_from_scrape_files(
             else:
                 file_type = "dtd_xml"
 
-            match = re.match(BILLS_PATTERN, path_object.name)
+            match = re.match(utils.BILLS_PATTERN, path_object.name)
             if match:
                 legis_class = "BILLS"
                 congress_num, legis_type, legis_num, legis_version = match.groups()
+                lastmod_path = path_object.parent / (path_object.name.split(".")[0] + "-lastmod.txt")
+                lastmod_str = lastmod_path.read_text()
             else:
-                match = re.match(PLAW_PATTERN, path_object.name)
+                match = re.match(utils.PLAW_PATTERN, path_object.name)
                 if match:
                     legis_class = "PLAW"
                     legis_version = None
@@ -65,6 +65,8 @@ def dataframe_from_scrape_files(
                     if match is None:
                         print("text oops: {}".format(path_object))
                         break
+                    lastmod_path = path_object.parent / (path_object.name.split(".")[0] + "-lastmod.txt")
+                    lastmod_str = lastmod_path.read_text()
 
         congress_num = int(congress_num)
         legis_num = int(legis_num)
@@ -76,9 +78,10 @@ def dataframe_from_scrape_files(
             "legis_num": legis_num,
             "legis_version": legis_version,
             "legis_class": legis_class.lower(),
-            "path": path_str,
+            "scrape_path": path_str,
             "file_name": Path(path_str).name,
             "file_type": file_type,
+            "lastmod": lastmod_str,
             "xml": path_object.read_text(),
         }
         rows.append(metadata)
@@ -111,7 +114,8 @@ def write_local(congress_scraper_path: Union[str, Path]):
                 "congress_num",
                 "legis_type",
                 "legis_num",
-                "path",
+                "scrape_path",
+                "lastmod",
                 "xml",
             ]
             out_path = congress_hf_path / "usc-billstatus-xml"
@@ -137,8 +141,9 @@ def write_local(congress_scraper_path: Union[str, Path]):
                     "legis_num",
                     "legis_version",
                     "legis_class",
-                    "path",
+                    "scrape_path",
                     "file_name",
+                    "lastmod",
                     "xml",
                 ]
                 df_out["text_id"] = df_out.apply(
