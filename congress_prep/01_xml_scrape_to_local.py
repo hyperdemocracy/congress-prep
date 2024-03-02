@@ -109,6 +109,7 @@ def write_local(congress_scraper_path: Union[str, Path]):
         # --------------------------------
         df_out = df_cn[df_cn["file_type"] == "billstatus"]
         if df_out.shape[0] > 0:
+            df_out = df_out.rename(columns={"xml": "billstatus_xml"})
             cols = [
                 "legis_id",
                 "congress_num",
@@ -116,15 +117,15 @@ def write_local(congress_scraper_path: Union[str, Path]):
                 "legis_num",
                 "scrape_path",
                 "lastmod",
-                "xml",
+                "billstatus_xml",
             ]
+            df_out = df_out[cols]
             out_path = congress_hf_path / "usc-billstatus-xml"
             out_path.mkdir(parents=True, exist_ok=True)
             fpath = out_path / f"usc-{cn}-billstatus-xml.parquet"
             df_out = df_out.sort_values(["legis_type", "legis_num"]).reset_index(
                 drop=True
             )
-            df_out = df_out[cols]
             rich.print(fpath)
             df_out.to_parquet(fpath)
 
@@ -133,6 +134,7 @@ def write_local(congress_scraper_path: Union[str, Path]):
         for xml_type in ["dtd_xml", "uslm_xml"]:
             df_out = df_cn[df_cn["file_type"] == xml_type].copy()
             if df_out.shape[0] > 0:
+                df_out = df_out.rename(columns={"xml": xml_type})
                 cols = [
                     "text_id",
                     "legis_id",
@@ -144,12 +146,13 @@ def write_local(congress_scraper_path: Union[str, Path]):
                     "scrape_path",
                     "file_name",
                     "lastmod",
-                    "xml",
+                    xml_type,
                 ]
                 df_out["text_id"] = df_out.apply(
                     lambda x: x["legis_id"] + "-" + str(x["legis_version"]), axis=1
                 )
                 assert df_out["text_id"].nunique() == df_out.shape[0]
+                df_out = df_out[cols]
                 out_path = congress_hf_path / "usc-textversions-{}".format(
                     xml_type.replace("_", "-")
                 )
@@ -160,7 +163,7 @@ def write_local(congress_scraper_path: Union[str, Path]):
                 df_out = df_out.sort_values(
                     ["legis_type", "legis_num", "legis_version"]
                 ).reset_index(drop=True)
-                df_out = df_out[cols]
+
                 rich.print(fpath)
                 df_out.to_parquet(fpath)
 

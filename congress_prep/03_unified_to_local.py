@@ -41,7 +41,7 @@ def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
 
         # find corresponding text versions
         tvs = []
-        for bs_tv in bs_row["metadata"]["text_versions"]:
+        for bs_tv in bs_row["billstatus_json"]["text_versions"]:
 
             # the file name in the url is the join key (e.g. BILLS-113hconres1rds.xml)
             if bs_tv["url"]:
@@ -71,11 +71,11 @@ def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
             tv["bs_type"] = bs_tv["type"]
             tv["bs_url"] = bs_tv["url"]
 
-            xml = tv["xml"]
+            xml = tv["dtd_xml"]
             xml = xml.strip()
             xml = xml.replace(" & ", " &amp; ")
             tv["text_v1"] = get_bill_text_v1(xml)
-            tv.pop("xml")
+            tv.pop("dtd_xml")
             tvs.append(tv)
 
         # sort all text versions for a bill by date.
@@ -106,7 +106,7 @@ def merge_bs_tv(congress_hf_path: Union[str, Path], cn: int):
         "congress_num",
         "legis_type",
         "legis_num",
-        "metadata",
+        "billstatus_json",
         "textversions",
     ]
     df_out = df_out[cols]

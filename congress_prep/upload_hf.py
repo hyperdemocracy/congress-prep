@@ -124,8 +124,8 @@ if __name__ == "__main__":
 
     congress_hf_path = Path("/Users/galtay/data/congress-hf")
 
-    do_meta = True
-    do_text = False
+    do_meta = False
+    do_text = True
 
     if do_meta:
         file_types = [
@@ -140,10 +140,10 @@ if __name__ == "__main__":
     if do_text:
         file_types = [
             "unified_v1",
-            "chunks_v1_s1024_o256",
-            "chunks_v1_s2048_o256",
-            "chunks_v1_s4096_o512",
-            "chunks_v1_s8192_o512",
+#            "chunks_v1_s1024_o256",
+#            "chunks_v1_s2048_o256",
+#            "chunks_v1_s4096_o512",
+#            "chunks_v1_s8192_o512",
         ]
         congress_nums = list(range(113, 119))
         upload_hf(congress_hf_path, congress_nums, file_types)

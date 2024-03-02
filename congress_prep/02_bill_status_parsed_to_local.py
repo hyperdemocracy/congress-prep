@@ -39,13 +39,13 @@ def write_local(
 
     bss = []
     for _, row in df.iterrows():
-        bs = BillStatus.from_xml_str(row["xml"])
+        bs = BillStatus.from_xml_str(row["billstatus_xml"])
         # make everything serializable
         bss.append(json.loads(bs.model_dump_json()))
     df_bss = pd.DataFrame(bss)
 
-    df["metadata"] = bss
-    df = df.drop(columns=["xml"])
+    df["billstatus_json"] = bss
+    df = df.drop(columns=["billstatus_xml"])
 
     table = pa.Table.from_pandas(df)
     out_path = congress_hf_path / "usc-billstatus-parsed"
