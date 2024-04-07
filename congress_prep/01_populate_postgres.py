@@ -1,5 +1,5 @@
 """
-Insert scraped legislation xml files into postgres.
+Insert legislation xml files into postgres.
 """
 
 import json
@@ -287,9 +287,9 @@ if __name__ == "__main__":
     conn_str = "postgresql+psycopg2://galtay@localhost:5432/galtay"
     congress_scraper_path = Path("/Users/galtay/data/congress-scraper")
 
-    #    reset_tables(conn_str)
-    #    upsert_billstatus(congress_scraper_path, conn_str)
-    #    upsert_textversions(congress_scraper_path, conn_str)
+    reset_tables(conn_str)
+    upsert_billstatus(congress_scraper_path, conn_str)
+    upsert_textversions(congress_scraper_path, conn_str)
     create_unified(conn_str)
 
     engine = create_engine(conn_str, echo=True)
