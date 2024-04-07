@@ -1,25 +1,35 @@
-# congress-preproc
+# congress-prep
 
 
-# skypilot scraper
+Tools to bulk download and process legislative XML.
 
-Launch skypilot test job,
-```shell
-sky launch test.yaml --down --idle-minutes-to-autostop 1 --env CONGRESS_NUM=118
+
+# Playbook
+
+## Install [congress](https://github.com/unitedstates/congress.git)
+
+```bash
+git clone https://github.com/unitedstates/congress.git
+pip install -e congress
 ```
 
-Launch skypilot scraping job,
-```shell
-sky launch congress-scraper.yaml --down --idle-minutes-to-autostop 1 --env CONGRESS_NUM=118
+## Update XML files on download machine
+
+```bash
+./bulk_download/download-and-sync-with-log.sh
 ```
 
-# copy or sync s3 to local
+## Sync to local machine
 
-```shell
-aws s3 cp --recursive s3://hyperdemocracy/congress-scraper /local/path/to/congress-scraper
+```bash
+aws s3 sync s3://hyperdemocracy/congress-scraper congress-scraper
 ```
 
-```shell
-aws s3 sync s3://hyperdemocracy/congress-scraper /local/path/to/congress-scraper
+
+## Upsert into postgres
+
+```bash
+python congress_prep/01_populate_postgres.py
 ```
+
 
