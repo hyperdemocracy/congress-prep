@@ -137,7 +137,7 @@ class Action(BaseModel):
 
     @classmethod
     def from_xel(cls, xel: Optional[Element]) -> Optional[Action]:
-        if xel is None:
+        if xel is None or len(xel.findall("*"))==0:
             return None
         action = cls(
             action_date=get_text_or_none(xel.find("actionDate")),
@@ -190,7 +190,7 @@ class RelatedBill(BaseModel):
     congress: int
     number: int
     type: str
-    latest_action: Action
+    latest_action: Optional[Action] = None
     relationship_details: list[RelationshipDetail]
 
     @classmethod

@@ -292,5 +292,5 @@ if __name__ == "__main__":
     upsert_textversions(congress_scraper_path, conn_str)
     create_unified(conn_str)
 
-    engine = create_engine(conn_str, echo=True)
-    df = pd.read_sql("select * from unified limit 1", con=engine)
+#    engine = create_engine(conn_str, echo=True)
+#    df = pd.read_sql("select * from unified limit 1", con=engine)
