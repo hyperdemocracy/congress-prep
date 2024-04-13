@@ -2287,12 +2287,12 @@ twitter = ["twython"]
 
 [[package]]
 name = "nomic"
-version = "3.0.9"
+version = "3.0.23"
 description = "The official Nomic python client."
 optional = false
 python-versions = "*"
 files = [
-    {file = "nomic-3.0.9.tar.gz", hash = "sha256:268a196a38ebc21a4f02c24e33e28408644241c2027f217aa5e564ffa12e5be5"},
+    {file = "nomic-3.0.23.tar.gz", hash = "sha256:45423725b5ea795ddf11a337de2c737458fbca1fc8f0112843176ca49bc011c6"},
 ]
 
 [package.dependencies]
@@ -2310,7 +2310,10 @@ rich = "*"
 tqdm = "*"
 
 [package.extras]
-dev = ["black", "cairosvg", "coverage", "mkautodoc", "mkdocs-jupyter", "mkdocs-material", "mkdocstrings[python]", "myst-parser", "pillow", "pylint", "pytest", "twine"]
+all = ["nomic[aws,local]"]
+aws = ["boto3", "sagemaker"]
+dev = ["black", "cairosvg", "coverage", "mkautodoc", "mkdocs-jupyter", "mkdocs-material", "mkdocstrings[python]", "myst-parser", "nomic[all]", "pillow", "pylint", "pytest", "twine"]
+local = ["gpt4all (>=2.5.0,<3)"]
 
 [[package]]
 name = "numpy"
@@ -5680,4 +5683,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "a8a651030cf3a3f862176a7bd658db4a7ba007ba62b9db873884eb1a1371fe81"
+content-hash = "9f0885748962488567b5fadf8a5dab4002ec0dcb9a173613d8225f75a16c0385"
