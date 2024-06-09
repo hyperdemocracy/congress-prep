@@ -307,11 +307,11 @@ def create_unified_xml(conn_str: str):
     -- join BS and TV textversions. keep only dtd xml text versions
     jnd_tvs as (
       select
-        textversion.*,
+        textversion_xml.*,
         bs_tv
       from bs_tvs_v2
-      join textversion
-      on bs_tvs_v2.file_name = textversion.file_name
+      join textversion_xml
+      on bs_tvs_v2.file_name = textversion_xml.file_name
       where xml_type = 'dtd'
     ),
 
@@ -356,9 +356,9 @@ def create_unified_xml(conn_str: str):
 conn_str = "postgresql+psycopg2://galtay@localhost:5432/galtay"
 congress_scraper_path = Path("/Users/galtay/data/congress-scraper")
 
-reset_tables(conn_str)
-upsert_billstatus_xml(congress_scraper_path, conn_str, batch_size=5_000, echo=False)
-missed = upsert_textversion_xml(congress_scraper_path, conn_str, batch_size=1_000, echo=False)
+#reset_tables(conn_str)
+#upsert_billstatus_xml(congress_scraper_path, conn_str, batch_size=5_000, echo=False)
+#missed = upsert_textversion_xml(congress_scraper_path, conn_str, batch_size=1_000, echo=False)
 create_unified_xml(conn_str)
 
 #df = pd.read_sql("select * from billstatus_xml limit 1", con=engine)
