@@ -9,6 +9,7 @@ import rich
 from typing import Union
 from typing import Optional
 
+from bs4 import BeautifulSoup
 import pandas as pd
 import sqlalchemy
 from sqlalchemy import create_engine
@@ -16,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert
+import xml.etree.ElementTree as ET
 
 from congress_prep import orm_mod
 from congress_prep import utils
@@ -121,6 +123,100 @@ def upsert_billstatus(
             upsert(session, orm_mod.BillStatus.__table__, rows)
 
 
+def upsert_textversions_xml(
+    congress_scraper_path: Union[str, Path], conn_str: str, batch_size: int = 1000
+):
+    """Upsert textversions xml files into postgres
+
+    Args:
+        congress_scraper_path: should have "cache" and "data" as subdirectories
+        conn_str: postgres connection string
+        batch_size: number of billstatus files to upsert at once
+    """
+
+    data_path = Path(congress_scraper_path) / "data"
+    Session = get_session(conn_str)
+
+    rows = []
+    ibatch = 0
+    for path_object in data_path.rglob("*.xml"):
+        path_str = str(path_object.relative_to(congress_scraper_path))
+
+        if "/uslm/" in path_str:
+            xml_type = "uslm"
+        else:
+            xml_type = "dtd"
+
+        if match := re.match(utils.BILLS_PATTERN, path_object.name):
+            legis_class = "bills"
+            congress_num, legis_type, legis_num, legis_version = match.groups()
+
+        elif match := re.match(utils.PLAW_PATTERN, path_object.name):
+            legis_class = "plaw"
+            legis_version = "plaw"
+            congress_num, legis_type, legis_num = match.groups()
+
+        else:
+            continue
+
+        lastmod_path = path_object.parent / (
+            path_object.name.split(".")[0] + "-lastmod.txt"
+        )
+        lastmod_str = lastmod_path.read_text()
+        xml = path_object.read_text().strip()
+        try:
+            root = ET.fromstring(xml)
+            root_tag = root.tag
+            root_tag = root_tag.replace("{http://schemas.gpo.gov/xml/uslm}", "")
+        except:
+            print(f"couldn't parse xml path {path_str} with ET")
+            root_tag = "parse_failed"
+
+
+        if root_tag == "parse_failed":
+            soup = BeautifulSoup(xml, "xml")
+            root_tags = [el.name for el in soup.contents if el.name]
+            if len(root_tags) != 1:
+                print("root tags: ", root_tags)
+            else:
+                root_tag = root_tags[0]
+                print("parsed with soup worked", root_tag)
+
+        if root_tag not in ("bill", "resolution", "amendment-doc", "pLaw", "parse_failed"):
+            print(f"root tag not recognized: {root_tag}")
+
+        row = {
+            "tv_id": "{}-{}-{}-{}-{}".format(
+                congress_num, legis_type, legis_num, legis_version, xml_type
+            ),
+            "legis_id": "{}-{}-{}".format(congress_num, legis_type, legis_num),
+            "congress_num": int(congress_num),
+            "legis_type": legis_type,
+            "legis_num": int(legis_num),
+            "legis_version": legis_version,
+            "legis_class": legis_class,
+            "scrape_path": path_str,
+            "file_name": Path(path_str).name,
+            "lastmod": lastmod_str,
+            "xml_type": xml_type,
+            "root_tag": root_tag,
+            "tv_xml": xml,
+        }
+        rows.append(row)
+
+        if len(rows) >= batch_size:
+            rich.print(f"upserting textversions_xml batch {ibatch} with {len(rows)} rows.")
+            with Session() as session:
+                upsert(session, orm_mod.TextVersionsXml.__table__, rows)
+            rows = []
+            ibatch += 1
+
+    if len(rows) > 0:
+        rich.print(f"upserting textversions_xml batch {ibatch} with {len(rows)} rows.")
+        with Session() as session:
+            upsert(session, orm_mod.TextVersionsXml.__table__, rows)
+
+
 def upsert_textversions(
     congress_scraper_path: Union[str, Path], conn_str: str, batch_size: int = 1000
 ):
@@ -162,6 +258,26 @@ def upsert_textversions(
         )
         lastmod_str = lastmod_path.read_text()
         xml = path_object.read_text().strip()
+        try:
+            root = ET.fromstring(xml)
+            root_tag = root.tag
+            root_tag = root_tag.replace("{http://schemas.gpo.gov/xml/uslm}", "")
+        except:
+            print(f"couldn't parse xml path {path_str} with ET")
+            root_tag = "parse_failed"
+
+
+        if root_tag == "parse_failed":
+            soup = BeautifulSoup(xml, "xml")
+            root_tags = [el.name for el in soup.contents if el.name]
+            if len(root_tags) != 1:
+                print("root tags: ", root_tags)
+            else:
+                root_tag = root_tags[0]
+                print("parsed with soup worked", root_tag)
+
+        if root_tag not in ("bill", "resolution", "amendment-doc", "pLaw", "parse_failed"):
+            print(f"root tag not recognized: {root_tag}")
 
         row = {
             "tv_id": "{}-{}-{}-{}-{}".format(
@@ -177,6 +293,7 @@ def upsert_textversions(
             "file_name": Path(path_str).name,
             "lastmod": lastmod_str,
             "xml_type": xml_type,
+            "root_tag": root_tag,
             "tv_xml": xml,
             "tv_txt": get_bill_text_v4(xml),
         }
@@ -193,6 +310,93 @@ def upsert_textversions(
         rich.print(f"upserting textversions batch {ibatch} with {len(rows)} rows.")
         with Session() as session:
             upsert(session, orm_mod.TextVersions.__table__, rows)
+
+
+def create_unified_xml(conn_str: str):
+    """Join billstatus and textversions data.
+    Note that this uses the dtd xml text version not the uslm xml versions.
+
+    BS = billstatus
+    TV = textversions
+
+    billstatus xml files have an array of textversion info (not the actual text).
+    each textversions xml file has one version of the text for a bill.
+
+    Args:
+        conn_str: postgres connection string
+    """
+
+    sql = """
+    drop table if exists unified_xml;
+    create table unified_xml as (
+
+    with
+
+    -- turn BS textversion array with N entries into N rows
+    bs_tvs_v1 as (
+      select
+        legis_id,
+        json_array_elements(bs_json->'text_versions') as bs_tv
+      from billstatus
+    ),
+
+    -- pull file name from BS textversion for joining to TV
+    bs_tvs_v2 as (
+      select
+        legis_id,
+        bs_tv,
+        bs_tv->'url' as url,
+        split_part(bs_tv->>'url', '/', -1) as file_name
+      from bs_tvs_v1
+    ),
+
+    -- join BS and TV textversions. keep only dtd xml text versions
+    jnd_tvs as (
+      select
+        textversions.*,
+        bs_tv
+      from bs_tvs_v2
+      join textversions
+      on bs_tvs_v2.file_name = textversions.file_name
+      where xml_type = 'dtd'
+    ),
+
+    -- group TV info by legis_id
+    tvs as (
+      select
+        legis_id,
+        json_agg(
+          json_build_object(
+            'tv_id', tv_id,
+            'legis_id', legis_id,
+            'congress_num', congress_num,
+            'legis_type', legis_type,
+            'legis_num', legis_num,
+            'legis_version', legis_version,
+            'legis_class', legis_class,
+            'scrape_path', scrape_path,
+            'file_name', file_name,
+            'lastmod', lastmod,
+            'xml_type', xml_type,
+            'root_tag', root_tag,
+            'tv_xml', tv_xml,
+            'bs_tv', bs_tv
+          ) order by lastmod desc
+        ) as tvs
+      from jnd_tvs
+      group by legis_id
+    )
+
+    -- join billstatus info with text versions
+    select billstatus.*, tvs.tvs from billstatus join tvs
+    on billstatus.legis_id = tvs.legis_id
+    )
+    """
+
+    engine = create_engine(conn_str, echo=True)
+    with engine.connect() as conn:
+        with conn.begin():
+            result = conn.execute(text(sql))
 
 
 def create_unified(conn_str: str):
@@ -261,6 +465,7 @@ def create_unified(conn_str: str):
             'file_name', file_name,
             'lastmod', lastmod,
             'xml_type', xml_type,
+            'root_tag', root_tag,
             'tv_xml', tv_xml,
             'tv_txt', tv_txt,
             'bs_tv', bs_tv
@@ -289,8 +494,8 @@ if __name__ == "__main__":
 
     reset_tables(conn_str)
     upsert_billstatus(congress_scraper_path, conn_str)
-    upsert_textversions(congress_scraper_path, conn_str)
-    create_unified(conn_str)
+    upsert_textversions_xml(congress_scraper_path, conn_str)
+    create_unified_xml(conn_str)
 
 #    engine = create_engine(conn_str, echo=True)
 #    df = pd.read_sql("select * from unified limit 1", con=engine)

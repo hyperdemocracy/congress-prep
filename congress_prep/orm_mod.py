@@ -27,7 +27,25 @@ class BillStatus(Base):
     bs_json = mapped_column(type_=JSON, nullable=False)
 
 
-class TextVersions(Base):
+class TextVersionsXml(Base):
+    __tablename__ = "textversions_xml"
+
+    tv_id: Mapped[str] = mapped_column(primary_key=True)
+    legis_id: Mapped[str]
+    congress_num: Mapped[int]
+    legis_type: Mapped[str]
+    legis_num: Mapped[int]
+    legis_version: Mapped[str]
+    legis_class: Mapped[str]
+    scrape_path: Mapped[str]
+    file_name: Mapped[str]
+    lastmod: Mapped[datetime.datetime]
+    xml_type: Mapped[str]
+    root_tag: Mapped[str]
+    tv_xml: Mapped[str]
+
+
+class TextVersionsTxt(Base):
     __tablename__ = "textversions"
 
     tv_id: Mapped[str] = mapped_column(primary_key=True)
@@ -41,5 +59,5 @@ class TextVersions(Base):
     file_name: Mapped[str]
     lastmod: Mapped[datetime.datetime]
     xml_type: Mapped[str]
-    tv_xml: Mapped[str]
+    root_tag: Mapped[str]
     tv_txt: Mapped[str]
